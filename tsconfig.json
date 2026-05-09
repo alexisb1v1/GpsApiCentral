@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@common/*": ["src/common/*"],
+      "@tenant/*": ["src/tenant/*"],
+      "@user/*": ["src/user/*"],
+      "@vehicle/*": ["src/vehicle/*"],
+      "@infraction/*": ["src/infraction/*"],
+      "@daily-ticket/*": ["src/daily-ticket/*"],
+      "@route/*": ["src/route/*"],
+      "@tracking/*": ["src/tracking/*"]
+    },
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  }
+}
