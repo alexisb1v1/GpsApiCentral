@@ -25,7 +25,7 @@ export class UserEntity {
     name: 'is_active',
     type: 'enum',
     enum: RegisterStatus,
-    default: RegisterStatus.OPERATIVO,
+    default: RegisterStatus.ACTIVE,
   })
   status: RegisterStatus;
 }

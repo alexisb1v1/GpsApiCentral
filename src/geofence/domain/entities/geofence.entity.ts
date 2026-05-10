@@ -32,7 +32,7 @@ export class GeofenceEntity {
   @Column({
     type: 'enum',
     enum: RegisterStatus,
-    default: RegisterStatus.OPERATIVO,
+    default: RegisterStatus.ACTIVE,
   })
   status: RegisterStatus;
 

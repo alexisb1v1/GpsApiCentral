@@ -1,4 +1,4 @@
-import { RegisterStatus } from '@geofence/domain/entities/geofence.entity';
+import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
 
 export class UpdateGeofenceStatusCommand {
   constructor(

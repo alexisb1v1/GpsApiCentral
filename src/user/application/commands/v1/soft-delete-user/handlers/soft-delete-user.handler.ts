@@ -5,6 +5,7 @@ import { SoftDeleteUserCommand } from '../soft-delete-user.command';
 import { UserRepository } from '@user/domain/repositories/user.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
 
 @CommandHandler(SoftDeleteUserCommand)
 export class SoftDeleteUserHandler implements ICommandHandler<SoftDeleteUserCommand> {
@@ -19,9 +20,9 @@ export class SoftDeleteUserHandler implements ICommandHandler<SoftDeleteUserComm
     if (result.isErr()) return err(result.error);
 
     const user = result.value;
-    const oldValues = { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive };
+    const oldValues = { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status };
 
-    user.isActive = false;
+    user.status = RegisterStatus.DELETE;
 
     const saveResult = await this.userRepository.save(user);
     if (saveResult.isErr()) return err(saveResult.error);
@@ -34,7 +35,7 @@ export class SoftDeleteUserHandler implements ICommandHandler<SoftDeleteUserComm
       entityName: 'users',
       entityId: user.id,
       oldValues: oldValues,
-      newValues: { isActive: false },
+      newValues: { status: RegisterStatus.DELETE },
       ipAddress: command.ipAddress,
       userAgent: command.userAgent,
     });
