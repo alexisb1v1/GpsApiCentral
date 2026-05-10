@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  gps-api-central:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/gps-api-central:latest
+    container_name: gps-api-central
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_HOST: postgres_prod
+      DB_PORT: 5432
+      DB_USERNAME: your_db_user
+      DB_PASSWORD: your_db_password
+      DB_NAME: your_db_name
+      NODE_ENV: production
+      JWT_SECRET: your_jwt_secret
+      JWT_EXPIRATION: 24h
+    networks:
+      - caddy_net
+
+networks:
+  caddy_net:
+    external: true
