@@ -1,6 +1,6 @@
 import { IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { InfractionType } from '../../../../domain/entities/infraction.entity';
+import { InfractionType } from '@infraction/domain/entities/infraction.entity';
 
 export class CreateInfractionRequestDto {
   @ApiProperty({ example: 'vehicle-uuid' })

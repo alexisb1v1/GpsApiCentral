@@ -2,8 +2,8 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { UpdateRouteStopsCommand } from '../update-route-stops.command';
-import { RouteRepository } from '../../../../domain/repositories/route.repository';
-import { RouteStopEntity } from '../../../../domain/entities/route-stop.entity';
+import { RouteRepository } from '@route/domain/repositories/route.repository';
+import { RouteStopEntity } from '@route/domain/entities/route-stop.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 

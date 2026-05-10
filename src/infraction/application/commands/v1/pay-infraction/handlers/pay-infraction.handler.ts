@@ -2,8 +2,8 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { PayInfractionCommand } from '../pay-infraction.command';
-import { InfractionRepository } from '../../../../domain/repositories/infraction.repository';
-import { InfractionStatus } from '../../../../domain/entities/infraction.entity';
+import { InfractionRepository } from '@infraction/domain/repositories/infraction.repository';
+import { InfractionStatus } from '@infraction/domain/entities/infraction.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 
@@ -24,18 +24,12 @@ export class PayInfractionHandler implements ICommandHandler<PayInfractionComman
 
     // 2. Validar pertenencia al tenant
     if (infraction.tenantId !== command.tenantId) {
-      return err({
-        code: 'FORBIDDEN',
-        message: 'No tienes permiso para pagar esta infracción',
-      } as AppError);
+      return err('FORBIDDEN');
     }
 
     // 3. Validar estado (solo se pueden pagar las PENDING)
     if (infraction.status === InfractionStatus.PAID) {
-      return err({
-        code: 'BAD_REQUEST',
-        message: 'La infracción ya ha sido pagada',
-      } as AppError);
+      return err('INVALID_INPUT');
     }
 
     // 4. Clonar estado anterior para auditoría
@@ -43,7 +37,7 @@ export class PayInfractionHandler implements ICommandHandler<PayInfractionComman
 
     // 5. Actualizar estado
     infraction.status = InfractionStatus.PAID;
-    infraction.paymentId = command.paymentId;
+    infraction.paymentId = command.paymentId || null;
 
     // 6. Guardar cambios
     const saveResult = await this.infractionRepository.save(infraction);

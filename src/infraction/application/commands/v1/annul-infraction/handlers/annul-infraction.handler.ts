@@ -2,8 +2,8 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { AnnulInfractionCommand } from '../annul-infraction.command';
-import { InfractionRepository } from '../../../../domain/repositories/infraction.repository';
-import { InfractionStatus } from '../../../../domain/entities/infraction.entity';
+import { InfractionRepository } from '@infraction/domain/repositories/infraction.repository';
+import { InfractionStatus } from '@infraction/domain/entities/infraction.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 
@@ -24,20 +24,14 @@ export class AnnulInfractionHandler implements ICommandHandler<AnnulInfractionCo
 
     // 2. Validar pertenencia al tenant
     if (infraction.tenantId !== command.tenantId) {
-      return err({
-        code: 'FORBIDDEN',
-        message: 'No tienes permiso para anular esta infracción',
-      } as AppError);
+      return err('FORBIDDEN');
     }
 
     // 3. Validar estado (solo se pueden anular si no están ya anuladas o pagadas)
     // El usuario podría querer anular una pagada (proceso de devolución), pero usualmente es solo PENDING.
     // Vamos a permitir anular PENDING por ahora.
     if (infraction.status === InfractionStatus.ANNULLED) {
-      return err({
-        code: 'BAD_REQUEST',
-        message: 'La infracción ya se encuentra anulada',
-      } as AppError);
+      return err('INVALID_INPUT');
     }
 
     // 4. Clonar estado anterior para auditoría

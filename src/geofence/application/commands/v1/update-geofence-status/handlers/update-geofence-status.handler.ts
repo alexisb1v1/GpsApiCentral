@@ -2,7 +2,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { UpdateGeofenceStatusCommand } from '../update-geofence-status.command';
-import { GeofenceRepository } from '../../../../domain/repositories/geofence.repository';
+import { GeofenceRepository } from '@geofence/domain/repositories/geofence.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 

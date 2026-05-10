@@ -1,4 +1,4 @@
-import { InfractionType } from '../../domain/entities/infraction.entity';
+import { InfractionType } from '@infraction/domain/entities/infraction.entity';
 
 export class CreateInfractionCommand {
   constructor(

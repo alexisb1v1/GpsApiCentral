@@ -2,8 +2,8 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { CreateRouteCommand } from '../create-route.command';
-import { RouteRepository } from '../../../../domain/repositories/route.repository';
-import { RouteEntity } from '../../../../domain/entities/route.entity';
+import { RouteRepository } from '@route/domain/repositories/route.repository';
+import { RouteEntity } from '@route/domain/entities/route.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 

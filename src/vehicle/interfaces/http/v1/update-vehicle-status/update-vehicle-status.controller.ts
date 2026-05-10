@@ -1,4 +1,4 @@
-import { Controller, Patch, Body, Param, Ip, Headers } from '@nestjs/common';
+import { Controller, Put, Body, Param, Ip, Headers } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UpdateVehicleStatusRequestDto } from './dto/update-vehicle-status.request.dto';

@@ -1,4 +1,4 @@
-import { RegisterStatus } from '../../../../domain/entities/geofence.entity';
+import { RegisterStatus } from '@geofence/domain/entities/geofence.entity';
 
 export class UpdateGeofenceStatusCommand {
   constructor(

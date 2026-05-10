@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsInt, IsEnum } from 'class-validator';
-import { GeofenceType } from '../../../../domain/entities/geofence.entity';
+import { GeofenceType } from '@geofence/domain/entities/geofence.entity';
 
 export class CreateGeofenceRequestDto {
   @ApiProperty({ description: 'ID de la geocerca en Traccar', example: 123 })

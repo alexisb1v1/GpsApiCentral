@@ -49,6 +49,9 @@ export class InfractionEntity {
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
   cancellationReason: string | null;
 
+  @Column({ name: 'payment_id', type: 'varchar', length: 100, nullable: true })
+  paymentId: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -18,11 +18,7 @@ export class TypeOrmInfractionRepository implements InfractionRepository {
       const saved = await this.repository.save(infraction);
       return ok(saved);
     } catch (error) {
-      return err({
-        code: 'DATABASE_ERROR',
-        message: 'Error al guardar la infracción',
-        details: error.message,
-      } as AppError);
+      return err('INTERNAL_ERROR');
     }
   }
 
@@ -30,18 +26,11 @@ export class TypeOrmInfractionRepository implements InfractionRepository {
     try {
       const infraction = await this.repository.findOne({ where: { id } });
       if (!infraction) {
-        return err({
-          code: 'NOT_FOUND',
-          message: 'Infracción no encontrada',
-        } as AppError);
+        return err('NOT_FOUND');
       }
       return ok(infraction);
     } catch (error) {
-      return err({
-        code: 'DATABASE_ERROR',
-        message: 'Error al buscar la infracción',
-        details: error.message,
-      } as AppError);
+      return err('INTERNAL_ERROR');
     }
   }
 
@@ -50,11 +39,7 @@ export class TypeOrmInfractionRepository implements InfractionRepository {
       const infractions = await this.repository.find({ where: { vehicleId } });
       return ok(infractions);
     } catch (error) {
-      return err({
-        code: 'DATABASE_ERROR',
-        message: 'Error al buscar infracciones del vehículo',
-        details: error.message,
-      } as AppError);
+      return err('INTERNAL_ERROR');
     }
   }
 }

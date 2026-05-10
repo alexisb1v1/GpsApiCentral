@@ -1,4 +1,4 @@
-import { GeofenceType } from '../../../../domain/entities/geofence.entity';
+import { GeofenceType } from '@geofence/domain/entities/geofence.entity';
 
 export class CreateGeofenceCommand {
   constructor(

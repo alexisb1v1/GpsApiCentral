@@ -20,7 +20,7 @@ export class DailyTicketEntity {
   registeredBy: string;
 
   @Column({ name: 'route_id', type: 'uuid', nullable: true })
-  routeId: string;
+  routeId: string | null;
 
   @Column({ name: 'work_date', type: 'date', default: () => 'CURRENT_DATE' })
   workDate: Date;

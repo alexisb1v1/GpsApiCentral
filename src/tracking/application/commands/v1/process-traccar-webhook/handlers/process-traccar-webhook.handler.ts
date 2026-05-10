@@ -4,7 +4,7 @@ import { ProcessTraccarWebhookCommand } from '../process-traccar-webhook.command
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
 import { GeofenceRepository } from '@geofence/domain/repositories/geofence.repository';
 import { DailyTicketRepository } from '@daily-ticket/domain/repositories/daily-ticket.repository';
-import { TrackingEventEntity, TrackingEventType } from '../../../../domain/entities/tracking-event.entity';
+import { TrackingEventEntity, TrackingEventType } from '@tracking/domain/entities/tracking-event.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual } from 'typeorm';
 import { GeofenceType } from '@geofence/domain/entities/geofence.entity';

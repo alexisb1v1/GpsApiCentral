@@ -19,7 +19,8 @@
       "@infraction/*": ["src/infraction/*"],
       "@daily-ticket/*": ["src/daily-ticket/*"],
       "@route/*": ["src/route/*"],
-      "@tracking/*": ["src/tracking/*"]
+      "@tracking/*": ["src/tracking/*"],
+      "@geofence/*": ["src/geofence/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

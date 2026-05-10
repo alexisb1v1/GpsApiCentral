@@ -1,3 +1,5 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TrackingEventEntity } from '../../domain/entities/tracking-event.entity';
 import { TraccarWebhookController } from '../../interfaces/http/v1/traccar-webhook/traccar-webhook.controller';

@@ -2,8 +2,8 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { Result, err, ok } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { GetRouteDetailQuery } from '../get-route-detail.query';
-import { RouteRepository } from '../../../../domain/repositories/route.repository';
-import { RouteEntity } from '../../../../domain/entities/route.entity';
+import { RouteRepository } from '@route/domain/repositories/route.repository';
+import { RouteEntity } from '@route/domain/entities/route.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 
 @QueryHandler(GetRouteDetailQuery)

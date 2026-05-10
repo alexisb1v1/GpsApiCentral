@@ -6,7 +6,7 @@ import { CreateInfractionCommand } from '../../../../application/commands/v1/cre
 import { matchResult } from '../../../../../common/http/match-result';
 import { CreateInfractionResponseDto } from './dto/create-infraction.response.dto';
 import { CurrentUser, UserContext } from '../../../../../shared/infrastructure/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../../../../auth/infrastructure/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../../../shared/infrastructure/guards/jwt-auth.guard';
 
 @ApiTags('Infraction')
 @ApiBearerAuth()
@@ -28,14 +28,14 @@ export class CreateInfractionController {
   ) {
     const result = await this.commandBus.execute(
       new CreateInfractionCommand(
+        user.tenantId,
         dto.vehicleId,
+        user.userId,
         dto.type,
         dto.amount,
-        user.tenantId,
-        user.userId,
+        dto.description || null,
         ip,
         userAgent,
-        dto.description,
       ),
     );
 
@@ -43,7 +43,7 @@ export class CreateInfractionController {
       result,
       (infraction) => new CreateInfractionResponseDto(true, 'Infracción registrada correctamente', infraction),
       {
-        VEHICLE_NOT_FOUND: 'El vehículo especificado no existe o no pertenece a su empresa',
+        NOT_FOUND: 'El vehículo especificado no existe o no pertenece a su empresa',
       },
     );
   }
