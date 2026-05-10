@@ -1,24 +1,35 @@
-# Base image
-FROM node:22-alpine AS base
-RUN npm install -g npm@latest
-
-# Build stage
-FROM base AS build
+# -------------------------
+# 1) Dependencies
+# -------------------------
+FROM node:20-alpine AS deps
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# -------------------------
+# 2) Build
+# -------------------------
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
 RUN npm run build
 
-# Production stage
-FROM base AS production
+# -------------------------
+# 3) Runner
+# -------------------------
+FROM node:20-alpine AS runner
 WORKDIR /app
-COPY --from=build /app/package*.json ./
-RUN npm install --only=production
-COPY --from=build /app/dist ./dist
 
-# Expose the port (NestJS default is 3000)
+ENV NODE_ENV=production
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/node_modules ./node_modules
+
 EXPOSE 3000
 
-# Run the app
-CMD ["node", "dist/main"]
+CMD ["node", "dist/main.js"]
