@@ -1,7 +1,7 @@
 import { Controller, Patch, Param, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AnnulInfractionRequestDto } from '@infraction/application/commands/v1/annul-infraction/dto/annul-infraction.request.dto';
+import { AnnulInfractionDto } from './dto/annul-infraction.dto';
 import { AnnulInfractionCommand } from '@infraction/application/commands/v1/annul-infraction/annul-infraction.command';
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
@@ -16,7 +16,7 @@ export class AnnulInfractionController {
   @ApiOperation({ summary: 'Anular una infracción registrada' })
   async execute(
     @Param('id') id: string,
-    @Body() dto: AnnulInfractionRequestDto,
+    @Body() dto: AnnulInfractionDto,
     @Req() req: any,
     @Audit() audit: AuditContext,
   ) {
@@ -24,6 +24,7 @@ export class AnnulInfractionController {
       new AnnulInfractionCommand(
         id,
         dto.reason,
+        req.user.tenantId,
         req.user.sub,
         audit.ip,
         audit.userAgent,

@@ -21,7 +21,7 @@ export class CreateGeofenceController {
   ) {
     const result = await this.commandBus.execute(
       new CreateGeofenceCommand(
-        dto.tenantId,
+        req.user.tenantId,
         dto.traccarGeofenceId,
         dto.name,
         dto.type,

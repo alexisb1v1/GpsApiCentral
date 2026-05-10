@@ -28,6 +28,7 @@ export class UpdateVehicleController {
         dto.brand,
         dto.model,
         dto.year,
+        req.user.tenantId,
         req.user.sub,
         dto.color,
         audit.ip,
