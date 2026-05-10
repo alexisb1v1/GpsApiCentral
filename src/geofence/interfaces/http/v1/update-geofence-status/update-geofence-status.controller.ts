@@ -1,40 +1,36 @@
-import { Controller, Put, Body, Param, Ip, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Patch, Param, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UpdateGeofenceStatusRequestDto } from './dto/update-geofence-status.request.dto';
-import { UpdateGeofenceStatusCommand } from '../../../../application/commands/v1/update-geofence-status/update-geofence-status.command';
-import { matchResult } from '../../../../../common/http/match-result';
-import { CurrentUser, UserContext } from '../../../../../shared/infrastructure/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../../../../shared/infrastructure/guards/jwt-auth.guard';
+import { UpdateGeofenceStatusCommand } from '@geofence/application/commands/v1/update-geofence-status/update-geofence-status.command';
+import { matchResult } from '@common/http/match-result';
+import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Geofence (Puntos de Control)')
+@ApiTags('Geofences')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller('v1/geofence')
+@Controller('v1/geofences')
 export class UpdateGeofenceStatusController {
   constructor(private readonly commandBus: CommandBus) {}
 
-  @Put('update-status/:id')
-  @ApiOperation({ summary: 'Cambiar el estado de una geocerca' })
-  @ApiResponse({ status: 200, description: 'Estado actualizado correctamente' })
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Actualizar el estado de una geocerca' })
   async execute(
     @Param('id') id: string,
     @Body() dto: UpdateGeofenceStatusRequestDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-    @CurrentUser() user: UserContext,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
       new UpdateGeofenceStatusCommand(
         id,
         dto.status,
-        user.tenantId,
-        user.userId,
-        ip,
-        userAgent,
+        req.user.tenantId,
+        req.user.sub,
+        audit.ip,
+        audit.userAgent,
       ),
     );
 
-    return matchResult(result, () => ({ success: true, message: 'Estado actualizado correctamente' }));
+    return matchResult(result);
   }
 }

@@ -1,13 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './shared/infrastructure/exceptions/global-exception.filter';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  // Especificamos NestExpressApplication para poder usar app.set()
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Configuración para obtener la IP real detrás de un Proxy (Caddy/Nginx)
+  app.set('trust proxy', true);
 
   // Seguridad
   app.use(helmet());
@@ -21,6 +26,7 @@ async function bootstrap() {
     .setTitle('GpsApiCentral')
     .setDescription('API Central para la gestión de dispositivos GPS')
     .setVersion('1.0')
+    .addBearerAuth() // Añadimos soporte para JWT en Swagger
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);

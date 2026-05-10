@@ -1,48 +1,35 @@
-import { Controller, Post, Body, Param, Ip, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Patch, Param, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../../../shared/infrastructure/guards/jwt-auth.guard';
-import { AnnulInfractionDto, AnnulInfractionResponseDto } from './dto/annul-infraction.dto';
-import { AnnulInfractionCommand } from '../../../../application/commands/v1/annul-infraction/annul-infraction.command';
-import { matchResult } from '../../../../../common/http/match-result';
-import { CurrentUser, UserContext } from '../../../../../shared/infrastructure/decorators/current-user.decorator';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { AnnulInfractionRequestDto } from './dto/annul-infraction.request.dto';
+import { AnnulInfractionCommand } from '@infraction/application/commands/v1/annul-infraction/annul-infraction.command';
+import { matchResult } from '@common/http/match-result';
+import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Infracciones')
+@ApiTags('Infractions')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller('v1/infraction')
+@Controller('v1/infractions')
 export class AnnulInfractionController {
   constructor(private readonly commandBus: CommandBus) {}
 
-  @Post('annul/:id')
-  @ApiOperation({ summary: 'Anular una infracción' })
-  @ApiResponse({ status: 200, type: AnnulInfractionResponseDto })
-  @ApiResponse({ status: 404, description: 'Infracción no encontrada' })
+  @Patch(':id/annul')
+  @ApiOperation({ summary: 'Anular una infracción registrada' })
   async execute(
     @Param('id') id: string,
-    @Body() dto: AnnulInfractionDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-    @CurrentUser() user: UserContext,
+    @Body() dto: AnnulInfractionRequestDto,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
       new AnnulInfractionCommand(
         id,
         dto.reason,
-        user.tenantId,
-        user.userId,
-        ip,
-        userAgent,
+        req.user.sub,
+        audit.ip,
+        audit.userAgent,
       ),
     );
 
-    return matchResult(
-      result,
-      () => new AnnulInfractionResponseDto(true, 'Infracción anulada correctamente'),
-      {
-        NOT_FOUND: 'La infracción especificada no existe',
-        FORBIDDEN: 'No tiene permisos sobre esta infracción',
-      },
-    );
+    return matchResult(result);
   }
 }

@@ -1,42 +1,35 @@
-import { Controller, Put, Body, Param, Ip, Headers } from '@nestjs/common';
+import { Controller, Patch, Param, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UpdateVehicleStatusRequestDto } from './dto/update-vehicle-status.request.dto';
 import { UpdateVehicleStatusCommand } from '@vehicle/application/commands/v1/update-vehicle-status/update-vehicle-status.command';
 import { matchResult } from '@common/http/match-result';
-import { UpdateVehicleStatusResponseDto } from './dto/update-vehicle-status.response.dto';
-import { CurrentUser, UserContext } from '@shared/infrastructure/decorators/current-user.decorator';
+import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Vehicle')
-@Controller('v1/vehicle')
+@ApiTags('Vehicles')
+@ApiBearerAuth()
+@Controller('v1/vehicles')
 export class UpdateVehicleStatusController {
   constructor(private readonly commandBus: CommandBus) {}
 
-  @Put('update-status/:vehicleId')
-  @ApiOperation({ summary: 'Cambiar el estado de un vehículo' })
-  @ApiResponse({ status: 200, description: 'Estado actualizado exitosamente', type: UpdateVehicleStatusResponseDto })
-  @ApiResponse({ status: 404, description: 'Vehículo no encontrado' })
+  @Patch(':id/status')
+  @ApiOperation({ summary: 'Actualizar el estado de un vehículo' })
   async execute(
-    @Param('vehicleId') vehicleId: string,
+    @Param('id') id: string,
     @Body() dto: UpdateVehicleStatusRequestDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-    @CurrentUser() user: UserContext,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
       new UpdateVehicleStatusCommand(
-        vehicleId, 
+        id,
         dto.status,
-        user.tenantId,
-        user.userId,
-        ip,
-        userAgent
+        req.user.sub,
+        audit.ip,
+        audit.userAgent,
       ),
     );
 
-    return matchResult(
-      result,
-      (vehicle) => new UpdateVehicleStatusResponseDto(true, 'Estado del vehículo actualizado correctamente', vehicle),
-    );
+    return matchResult(result);
   }
 }

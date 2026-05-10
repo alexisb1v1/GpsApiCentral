@@ -1,44 +1,38 @@
-import { Controller, Patch, Param, Body, ParseUUIDPipe, Ip, Headers } from '@nestjs/common';
+import { Controller, Put, Param, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UpdateTenantRequestDto } from './dto/update-tenant.request.dto';
 import { UpdateTenantCommand } from '@tenant/application/commands/v1/update-tenant/update-tenant.command';
 import { matchResult } from '@common/http/match-result';
-import { CreateTenantResponseDto } from '@tenant/interfaces/http/v1/create-tenant/dto/create-tenant.response.dto';
-import { CurrentUser, UserContext } from '@shared/infrastructure/decorators/current-user.decorator';
+import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Tenant')
-@Controller('v1/tenant')
+@ApiTags('Tenants')
+@ApiBearerAuth()
+@Controller('v1/tenants')
 export class UpdateTenantController {
   constructor(private readonly commandBus: CommandBus) {}
 
-  @Patch(':id')
+  @Put(':id')
   @ApiOperation({ summary: 'Actualizar datos de una empresa' })
-  @ApiResponse({ status: 200, type: CreateTenantResponseDto })
-  @ApiResponse({ status: 404, description: 'Empresa no encontrada' })
-  @ApiResponse({ status: 409, description: 'El subdominio ya existe' })
   async execute(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateTenantRequestDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-    @CurrentUser() user?: UserContext,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
       new UpdateTenantCommand(
-        id, 
-        dto.name, 
-        dto.subdomain, 
-        dto.isActive,
-        user?.userId,
-        ip,
-        userAgent
-      )
+        id,
+        dto.name,
+        dto.documentNumber,
+        dto.address,
+        dto.phone,
+        req.user.sub,
+        audit.ip,
+        audit.userAgent,
+      ),
     );
 
-    return matchResult(
-      result,
-      (tenant) => new CreateTenantResponseDto(tenant)
-    );
+    return matchResult(result);
   }
 }

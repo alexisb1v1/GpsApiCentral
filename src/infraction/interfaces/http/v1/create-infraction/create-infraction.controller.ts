@@ -1,50 +1,38 @@
-import { Controller, Post, Body, Ip, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { CreateInfractionRequestDto } from '../../../../application/commands/v1/create-infraction/dto/create-infraction.request.dto';
-import { CreateInfractionCommand } from '../../../../application/commands/v1/create-infraction/create-infraction.command';
-import { matchResult } from '../../../../../common/http/match-result';
-import { CreateInfractionResponseDto } from './dto/create-infraction.response.dto';
-import { CurrentUser, UserContext } from '../../../../../shared/infrastructure/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../../../../shared/infrastructure/guards/jwt-auth.guard';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CreateInfractionRequestDto } from './dto/create-infraction.request.dto';
+import { CreateInfractionCommand } from '@infraction/application/commands/v1/create-infraction/create-infraction.command';
+import { matchResult } from '@common/http/match-result';
+import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Infraction')
+@ApiTags('Infractions')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller('v1/infraction')
+@Controller('v1/infractions')
 export class CreateInfractionController {
   constructor(private readonly commandBus: CommandBus) {}
 
-  @Post()
+  @Post('create')
   @ApiOperation({ summary: 'Registrar una nueva infracción' })
-  @ApiResponse({ status: 201, description: 'Infracción registrada exitosamente', type: CreateInfractionResponseDto })
-  @ApiResponse({ status: 400, description: 'Datos inválidos' })
-  @ApiResponse({ status: 404, description: 'Vehículo no encontrado' })
   async execute(
     @Body() dto: CreateInfractionRequestDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-    @CurrentUser() user: UserContext,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
       new CreateInfractionCommand(
-        user.tenantId,
+        dto.tenantId,
         dto.vehicleId,
-        user.userId,
-        dto.type,
+        dto.infractionTypeId,
+        dto.description,
         dto.amount,
-        dto.description || null,
-        ip,
-        userAgent,
+        dto.infractionDate,
+        req.user.sub,
+        audit.ip,
+        audit.userAgent,
       ),
     );
 
-    return matchResult(
-      result,
-      (infraction) => new CreateInfractionResponseDto(true, 'Infracción registrada correctamente', infraction),
-      {
-        NOT_FOUND: 'El vehículo especificado no existe o no pertenece a su empresa',
-      },
-    );
+    return matchResult(result);
   }
 }

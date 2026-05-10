@@ -1,47 +1,36 @@
-import { Controller, Post, Body, Ip, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { CreateGeofenceRequestDto } from '../../../../application/commands/v1/create-geofence/dto/create-geofence.request.dto';
-import { CreateGeofenceCommand } from '../../../../application/commands/v1/create-geofence/create-geofence.command';
-import { matchResult } from '../../../../../common/http/match-result';
-import { CreateGeofenceResponseDto } from './dto/create-geofence.response.dto';
-import { CurrentUser, UserContext } from '../../../../../shared/infrastructure/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../../../../shared/infrastructure/guards/jwt-auth.guard';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CreateGeofenceRequestDto } from './dto/create-geofence.request.dto';
+import { CreateGeofenceCommand } from '@geofence/application/commands/v1/create-geofence/create-geofence.command';
+import { matchResult } from '@common/http/match-result';
+import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Geofence (Puntos de Control)')
+@ApiTags('Geofences')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller('v1/geofence')
+@Controller('v1/geofences')
 export class CreateGeofenceController {
   constructor(private readonly commandBus: CommandBus) {}
 
   @Post('create')
-  @ApiOperation({ summary: 'Registrar un punto de control / paradero' })
-  @ApiResponse({ status: 201, type: CreateGeofenceResponseDto })
+  @ApiOperation({ summary: 'Registrar una nueva geocerca' })
   async execute(
     @Body() dto: CreateGeofenceRequestDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-    @CurrentUser() user: UserContext,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
       new CreateGeofenceCommand(
-        user.tenantId,
+        dto.tenantId,
         dto.traccarGeofenceId,
         dto.name,
         dto.type,
-        user.userId,
-        ip,
-        userAgent,
+        req.user.sub,
+        audit.ip,
+        audit.userAgent,
       ),
     );
 
-    return matchResult(
-      result,
-      (geofence) => new CreateGeofenceResponseDto(true, 'Geocerca registrada correctamente', geofence),
-      {
-        ALREADY_EXISTS: 'Esta geocerca de Traccar ya se encuentra registrada para su empresa',
-      },
-    );
+    return matchResult(result);
   }
 }

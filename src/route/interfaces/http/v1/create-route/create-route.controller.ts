@@ -1,42 +1,35 @@
-import { Controller, Post, Body, Ip, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CreateRouteRequestDto } from './dto/create-route.request.dto';
-import { CreateRouteCommand } from '../../../../application/commands/v1/create-route/create-route.command';
-import { matchResult } from '../../../../../common/http/match-result';
-import { CurrentUser, UserContext } from '../../../../../shared/infrastructure/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../../../../shared/infrastructure/guards/jwt-auth.guard';
+import { CreateRouteCommand } from '@route/application/commands/v1/create-route/create-route.command';
+import { matchResult } from '@common/http/match-result';
+import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Route (Gestión de Rutas)')
+@ApiTags('Routes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller('v1/route')
+@Controller('v1/routes')
 export class CreateRouteController {
   constructor(private readonly commandBus: CommandBus) {}
 
   @Post('create')
-  @ApiOperation({ summary: 'Crear una nueva ruta' })
-  @ApiResponse({ status: 201, description: 'Ruta creada exitosamente' })
+  @ApiOperation({ summary: 'Registrar una nueva ruta' })
   async execute(
     @Body() dto: CreateRouteRequestDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
-    @CurrentUser() user: UserContext,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
       new CreateRouteCommand(
+        dto.tenantId,
         dto.name,
-        user.tenantId,
-        user.userId,
-        ip,
-        userAgent,
+        dto.description,
+        req.user.sub,
+        audit.ip,
+        audit.userAgent,
       ),
     );
 
-    return matchResult(result, (route) => ({
-      success: true,
-      message: 'Ruta creada correctamente',
-      data: route,
-    }));
+    return matchResult(result);
   }
 }
