@@ -1,7 +1,7 @@
 import { Controller, Patch, Param, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { PayInfractionRequestDto } from './dto/pay-infraction.request.dto';
+import { PayInfractionRequestDto } from '@infraction/application/commands/v1/pay-infraction/dto/pay-infraction.request.dto';
 import { PayInfractionCommand } from '@infraction/application/commands/v1/pay-infraction/pay-infraction.command';
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';

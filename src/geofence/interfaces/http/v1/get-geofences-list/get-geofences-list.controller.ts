@@ -19,6 +19,6 @@ export class GetGeofencesListController {
   async execute(@CurrentUser() user: UserContext) {
     const result = await this.queryBus.execute(new GetGeofencesListQuery(user.tenantId));
 
-    return matchResult(result, (geofences) => geofences);
+    return matchResult(result);
   }
 }

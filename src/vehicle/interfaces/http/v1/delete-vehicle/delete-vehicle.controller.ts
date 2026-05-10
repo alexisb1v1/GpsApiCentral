@@ -27,6 +27,6 @@ export class DeleteVehicleController {
       ),
     );
 
-    return matchResult(result);
+    return matchResult(result, (data) => data);
   }
 }

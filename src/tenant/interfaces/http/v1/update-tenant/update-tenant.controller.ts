@@ -24,9 +24,8 @@ export class UpdateTenantController {
       new UpdateTenantCommand(
         id,
         dto.name,
-        dto.documentNumber,
-        dto.address,
-        dto.phone,
+        dto.subdomain,
+        dto.isActive,
         req.user.sub,
         audit.ip,
         audit.userAgent,

@@ -24,6 +24,7 @@ export class UpdateRouteStopsController {
       new UpdateRouteStopsCommand(
         id,
         dto.stops,
+        req.user.tenantId,
         req.user.sub,
         audit.ip,
         audit.userAgent,

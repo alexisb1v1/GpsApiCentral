@@ -1,7 +1,7 @@
 import { Controller, Patch, Param, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { AnnulInfractionRequestDto } from './dto/annul-infraction.request.dto';
+import { AnnulInfractionRequestDto } from '@infraction/application/commands/v1/annul-infraction/dto/annul-infraction.request.dto';
 import { AnnulInfractionCommand } from '@infraction/application/commands/v1/annul-infraction/annul-infraction.command';
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';

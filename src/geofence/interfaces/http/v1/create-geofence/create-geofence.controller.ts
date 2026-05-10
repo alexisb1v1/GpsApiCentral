@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { CreateGeofenceRequestDto } from './dto/create-geofence.request.dto';
+import { CreateGeofenceRequestDto } from '@geofence/application/commands/v1/create-geofence/dto/create-geofence.request.dto';
 import { CreateGeofenceCommand } from '@geofence/application/commands/v1/create-geofence/create-geofence.command';
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';

@@ -21,14 +21,14 @@ export class CreateVehicleController {
   ) {
     const result = await this.commandBus.execute(
       new CreateVehicleCommand(
-        dto.tenantId,
         dto.plate,
+        dto.traccarDeviceId || null,
         dto.brand,
         dto.model,
         dto.year,
-        dto.color,
-        dto.traccarId,
+        dto.tenantId,
         req.user.sub,
+        dto.color,
         audit.ip,
         audit.userAgent,
       ),

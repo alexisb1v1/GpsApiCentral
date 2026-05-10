@@ -21,9 +21,8 @@ export class CreateRouteController {
   ) {
     const result = await this.commandBus.execute(
       new CreateRouteCommand(
-        dto.tenantId,
         dto.name,
-        dto.description,
+        req.user.tenantId,
         req.user.sub,
         audit.ip,
         audit.userAgent,

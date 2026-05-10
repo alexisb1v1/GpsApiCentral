@@ -22,9 +22,8 @@ export class CreateTenantController {
     const result = await this.commandBus.execute(
       new CreateTenantCommand(
         dto.name,
-        dto.documentNumber,
-        dto.address,
-        dto.phone,
+        dto.subdomain,
+        dto.isActive,
         req.user.sub,
         audit.ip,
         audit.userAgent,

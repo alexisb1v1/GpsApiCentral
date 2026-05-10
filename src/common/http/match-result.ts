@@ -20,7 +20,7 @@ import { ERROR_CODES } from '../../shared/domain/errors/error-codes';
  */
 export function matchResult<T>(
   result: Result<T, AppError>,
-  onSuccess: (data: T) => any,
+  onSuccess: (data: T) => any = (data) => data,
   messages?: Partial<Record<AppError, string>>,
 ): any {
   return result.match(onSuccess, (error) => {
