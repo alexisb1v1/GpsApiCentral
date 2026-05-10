@@ -7,6 +7,7 @@ import { LoginCommand } from '../login.command';
 import { UserRepository } from '@user/domain/repositories/user.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
 
 @CommandHandler(LoginCommand)
 export class LoginHandler implements ICommandHandler<LoginCommand> {
@@ -24,8 +25,8 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
 
     const user = result.value;
 
-    // 2. Validar si está activo
-    if (!user.isActive) return err('UNAUTHORIZED');
+    // 2. Validar si está activo (Usando RegisterStatus.ACTIVE)
+    if (user.status !== RegisterStatus.ACTIVE) return err('UNAUTHORIZED');
 
     // 3. Validar password
     const isPasswordValid = await bcrypt.compare(command.password, user.password);

@@ -1,15 +1,11 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
+import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
 
 export enum GeofenceType {
   START = 'START',
   CHECKPOINT = 'CHECKPOINT',
   END = 'END',
-}
-
-export enum RegisterStatus {
-  OPERATIVO = 'OPERATIVO',
-  INACTIVO = 'INACTIVO',
 }
 
 @Entity('geofences')
