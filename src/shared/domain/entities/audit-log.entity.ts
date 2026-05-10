@@ -5,8 +5,8 @@ export class AuditLogEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'tenant_id', type: 'uuid' })
-  tenantId: string;
+  @Column({ name: 'tenant_id', type: 'uuid', nullable: true })
+  tenantId: string | null;
 
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId: string | null;

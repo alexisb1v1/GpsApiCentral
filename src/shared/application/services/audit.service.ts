@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { AuditLogEntity } from '../../domain/entities/audit-log.entity';
 
 export interface AuditLogData {
-  tenantId: string;
+  tenantId?: string | null;
   userId?: string | null;
   action: string;
   entityName: string;
@@ -30,8 +30,6 @@ export class AuditService {
     try {
       const log = this.auditRepository.create({
         ...data,
-        // Si no viene userId y es un webhook, se podría inferir o marcar aquí, 
-        // pero es mejor que el llamador lo especifique como 'system-webhook' en el contexto adecuado.
       });
       await this.auditRepository.save(log);
     } catch (error) {
@@ -46,7 +44,7 @@ export class AuditService {
   async createWebhookLog(data: Omit<AuditLogData, 'userId'>): Promise<void> {
     return this.createLog({
       ...data,
-      userId: null, // O un UUID específico que represente al sistema si se prefiere
+      userId: null,
       userAgent: 'system-webhook',
     });
   }
