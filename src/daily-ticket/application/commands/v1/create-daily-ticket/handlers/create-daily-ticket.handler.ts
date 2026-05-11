@@ -42,6 +42,7 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
     ticket.tenantId = command.tenantId;
     ticket.vehicleId = command.vehicleId;
     ticket.registeredBy = command.userId;
+    ticket.driverId = command.driverId;
     ticket.routeId = command.routeId;
     ticket.totalAmount = command.totalAmount;
     ticket.adminFee = command.adminFee;

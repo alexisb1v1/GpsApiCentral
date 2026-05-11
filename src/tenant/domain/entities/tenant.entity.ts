@@ -26,6 +26,15 @@ export class TenantEntity {
   @Column({ name: 'status_dot_color', type: 'varchar', length: 7, nullable: true })
   statusDotColor: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  address: string | null;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  phone: string | null;
+
+  @Column({ name: 'tax_id', type: 'varchar', length: 20, nullable: true })
+  taxId: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

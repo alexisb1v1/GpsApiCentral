@@ -51,10 +51,10 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     // 4. Registrar el Evento de Tracking (La Bitácora)
     const trackingEvent = new TrackingEventEntity();
     trackingEvent.tenantId = vehicle.tenantId;
-    trackingEvent.vehicleId = vehicle.id;
+    trackingEvent.dailyTicketId = ticket.id;
     trackingEvent.geofenceId = geofence.id;
     trackingEvent.eventType = event.type as TrackingEventType;
-    trackingEvent.fixTime = new Date(position.fixTime);
+    trackingEvent.serverTime = new Date(position.fixTime);
     trackingEvent.latitude = position.latitude;
     trackingEvent.longitude = position.longitude;
     await this.trackingEventRepository.save(trackingEvent);
@@ -64,11 +64,11 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
 
     // 6. Si es paradero intermedio (CHECKPOINT), verificar retraso
     if (geofence.type === GeofenceType.CHECKPOINT && ticket.routeId) {
-      await this.handleCheckpoint(vehicle.id, geofence.id, ticket.routeId, trackingEvent.fixTime, vehicle.tenantId);
+      await this.handleCheckpoint(ticket, geofence.id, ticket.routeId, trackingEvent.serverTime, vehicle.tenantId);
     }
   }
 
-  private async handleCheckpoint(vehicleId: string, geofenceId: string, routeId: string, arrivalTime: Date, tenantId: string) {
+  private async handleCheckpoint(ticket: DailyTicketEntity, geofenceId: string, routeId: string, arrivalTime: Date, tenantId: string) {
     // A. Buscar el orden y tiempo programado para este paradero en esta ruta
     const routeStop = await this.routeStopRepository.findOne({
       where: { routeId, geofenceId }
@@ -79,19 +79,19 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     // Buscamos el evento START más reciente de hoy para este vehículo
     const startEvent = await this.trackingEventRepository.findOne({
       where: {
-        vehicleId,
+        dailyTicketId: ticket.id,
         eventType: TrackingEventType.ENTER,
         geofence: { type: GeofenceType.START },
-        fixTime: MoreThanOrEqual(new Date(arrivalTime.toISOString().split('T')[0])) // Hoy
+        serverTime: MoreThanOrEqual(new Date(arrivalTime.toISOString().split('T')[0])) // Hoy
       },
-      order: { fixTime: 'DESC' },
+      order: { serverTime: 'DESC' },
       relations: ['geofence']
     });
 
     if (!startEvent) return;
 
     // C. Calcular Hora Programada
-    const scheduledTime = new Date(startEvent.fixTime.getTime() + routeStop.minutesFromStart * 60000);
+    const scheduledTime = new Date(startEvent.serverTime.getTime() + routeStop.minutesFromStart * 60000);
 
     // D. Comparar (Permitimos 2 minutos de tolerancia por ejemplo, o 0 según rigor)
     const delayMinutes = (arrivalTime.getTime() - scheduledTime.getTime()) / 60000;
@@ -100,7 +100,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
       // E. Generar Infracción Automática
       const infraction = new InfractionEntity();
       infraction.tenantId = tenantId;
-      infraction.vehicleId = vehicleId;
+      infraction.vehicleId = ticket.vehicleId;
       infraction.type = InfractionType.RETRASO_RUTA;
       infraction.amount = 10.00; // Monto base o configurable
       infraction.status = InfractionStatus.PENDING;

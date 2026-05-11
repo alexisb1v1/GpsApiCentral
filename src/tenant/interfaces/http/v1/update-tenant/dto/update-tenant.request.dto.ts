@@ -41,4 +41,21 @@ export class UpdateTenantRequestDto {
   @IsOptional()
   @MaxLength(7)
   statusDotColor?: string;
+
+  @ApiProperty({ example: 'Calle 123, Ciudad', required: false })
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiProperty({ example: '+51 987654321', required: false })
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  phone?: string;
+
+  @ApiProperty({ example: '20123456789', required: false })
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  taxId?: string;
 }

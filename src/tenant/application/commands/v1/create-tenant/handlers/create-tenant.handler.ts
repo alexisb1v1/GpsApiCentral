@@ -37,6 +37,9 @@ export class CreateTenantHandler implements ICommandHandler<CreateTenantCommand>
     newTenant.primaryColor = command.primaryColor ?? null;
     newTenant.accentColor = command.accentColor ?? null;
     newTenant.statusDotColor = command.statusDotColor ?? null;
+    newTenant.address = command.address ?? null;
+    newTenant.phone = command.phone ?? null;
+    newTenant.taxId = command.taxId ?? null;
 
     // 3. Guardar en persistencia
     const saveResult = await this.tenantRepository.save(newTenant);
@@ -57,7 +60,10 @@ export class CreateTenantHandler implements ICommandHandler<CreateTenantCommand>
           logoUrl: tenant.logoUrl,
           primaryColor: tenant.primaryColor,
           accentColor: tenant.accentColor,
-          statusDotColor: tenant.statusDotColor
+          statusDotColor: tenant.statusDotColor,
+          address: tenant.address,
+          phone: tenant.phone,
+          taxId: tenant.taxId
         },
         ipAddress: command.ipAddress,
         userAgent: command.userAgent,

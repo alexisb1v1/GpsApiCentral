@@ -7,6 +7,11 @@ export class CreateDailyTicketRequestDto {
   @IsUUID()
   vehicleId: string;
 
+  @ApiProperty({ description: 'ID del conductor', example: '550e8400-e29b-41d4-a716-446655440002', required: false })
+  @IsOptional()
+  @IsUUID()
+  driverId?: string;
+
   @ApiProperty({ description: 'Monto total pagado', example: 10.50 })
   @IsNotEmpty()
   @IsNumber()

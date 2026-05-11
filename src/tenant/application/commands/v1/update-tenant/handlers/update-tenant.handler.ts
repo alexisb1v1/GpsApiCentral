@@ -29,7 +29,10 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
       logoUrl: tenant.logoUrl,
       primaryColor: tenant.primaryColor,
       accentColor: tenant.accentColor,
-      statusDotColor: tenant.statusDotColor
+      statusDotColor: tenant.statusDotColor,
+      address: tenant.address,
+      phone: tenant.phone,
+      taxId: tenant.taxId
     };
 
     // 2. Si cambia el subdominio, validar que no esté en uso
@@ -46,6 +49,9 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
     if (command.primaryColor !== undefined) tenant.primaryColor = command.primaryColor;
     if (command.accentColor !== undefined) tenant.accentColor = command.accentColor;
     if (command.statusDotColor !== undefined) tenant.statusDotColor = command.statusDotColor;
+    if (command.address !== undefined) tenant.address = command.address;
+    if (command.phone !== undefined) tenant.phone = command.phone;
+    if (command.taxId !== undefined) tenant.taxId = command.taxId;
 
     // 4. Guardar
     const saveResult = await this.tenantRepository.save(tenant);
@@ -68,7 +74,10 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
           logoUrl: updatedTenant.logoUrl,
           primaryColor: updatedTenant.primaryColor,
           accentColor: updatedTenant.accentColor,
-          statusDotColor: updatedTenant.statusDotColor
+          statusDotColor: updatedTenant.statusDotColor,
+          address: updatedTenant.address,
+          phone: updatedTenant.phone,
+          taxId: updatedTenant.taxId
         },
         ipAddress: command.ipAddress,
         userAgent: command.userAgent,

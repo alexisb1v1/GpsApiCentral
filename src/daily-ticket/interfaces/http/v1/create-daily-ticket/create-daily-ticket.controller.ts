@@ -21,9 +21,10 @@ export class CreateDailyTicketController {
   ) {
     const result = await this.commandBus.execute(
       new CreateDailyTicketCommand(
-        req.user.tenantId || dto.vehicleId, // Usamos el tenant del usuario o el que corresponda
+        req.user.tenantId,
         dto.vehicleId,
         req.user.sub,
+        dto.driverId || null,
         dto.routeId || null,
         dto.totalAmount,
         dto.adminFee,

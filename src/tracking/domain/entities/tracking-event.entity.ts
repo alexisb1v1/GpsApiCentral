@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Jo
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { GeofenceEntity } from '@geofence/domain/entities/geofence.entity';
 import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
+import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 
 export enum TrackingEventType {
   ENTER = 'geofenceEnter',
@@ -16,8 +17,8 @@ export class TrackingEventEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
 
-  @Column({ name: 'vehicle_id', type: 'uuid' })
-  vehicleId: string;
+  @Column({ name: 'daily_ticket_id', type: 'uuid' })
+  dailyTicketId: string;
 
   @Column({ name: 'geofence_id', type: 'uuid', nullable: true })
   geofenceId: string;
@@ -31,8 +32,8 @@ export class TrackingEventEntity {
   })
   eventType: TrackingEventType;
 
-  @Column({ name: 'fix_time', type: 'timestamptz' })
-  fixTime: Date;
+  @Column({ name: 'server_time', type: 'timestamptz' })
+  serverTime: Date;
 
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
   latitude: number;
@@ -43,9 +44,9 @@ export class TrackingEventEntity {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @ManyToOne(() => VehicleEntity)
-  @JoinColumn({ name: 'vehicle_id' })
-  vehicle: VehicleEntity;
+  @ManyToOne(() => DailyTicketEntity)
+  @JoinColumn({ name: 'daily_ticket_id' })
+  dailyTicket: DailyTicketEntity;
 
   @ManyToOne(() => GeofenceEntity)
   @JoinColumn({ name: 'geofence_id' })

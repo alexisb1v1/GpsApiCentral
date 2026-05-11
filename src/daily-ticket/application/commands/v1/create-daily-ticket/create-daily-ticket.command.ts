@@ -3,6 +3,7 @@ export class CreateDailyTicketCommand {
     public readonly tenantId: string,
     public readonly vehicleId: string,
     public readonly userId: string,
+    public readonly driverId: string | null,
     public readonly routeId: string | null,
     public readonly totalAmount: number,
     public readonly adminFee: number,

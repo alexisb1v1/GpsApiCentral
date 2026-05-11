@@ -12,6 +12,7 @@ export enum TicketStatus {
 @Entity('daily_tickets')
 @Unique(['vehicleId', 'workDate'])
 @Index('idx_daily_tickets_tenant', ['tenantId'])
+@Index('idx_daily_tickets_driver', ['driverId'])
 export class DailyTicketEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -21,6 +22,9 @@ export class DailyTicketEntity {
 
   @Column({ name: 'registered_by', type: 'uuid' })
   registeredBy: string;
+
+  @Column({ name: 'driver_id', type: 'uuid', nullable: true })
+  driverId: string | null;
 
   @Column({ name: 'route_id', type: 'uuid', nullable: true })
   routeId: string | null;
@@ -57,6 +61,10 @@ export class DailyTicketEntity {
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'registered_by' })
   user: UserEntity;
+
+  @ManyToOne(() => UserEntity)
+  @JoinColumn({ name: 'driver_id' })
+  driver: UserEntity;
 
   @ManyToOne(() => TenantEntity)
   @JoinColumn({ name: 'tenant_id' })
