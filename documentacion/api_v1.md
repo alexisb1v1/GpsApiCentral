@@ -102,7 +102,25 @@ Esta documentación es el reflejo exacto de los endpoints disponibles en Swagger
 }
 ```
 
-### 3.2. Listar / Obtener Empresa
+### 3.2. Obtener Branding por Subdominio (Público)
+- **URL**: `GET /v1/tenants/branding/:subdomain`
+- **Auth**: Pública (No requiere token)
+- **Descripción**: Utilizado por el frontend para obtener el logo y colores antes de que el usuario inicie sesión.
+- **Response (200)**:
+```json
+{
+  "success": true,
+  "data": {
+    "name": "Empresa SAC",
+    "logoUrl": "https://...",
+    "primaryColor": "#3f51b5",
+    "accentColor": "#ff4081",
+    "statusDotColor": "#4caf50"
+  }
+}
+```
+
+### 3.3. Listar / Obtener Empresa
 - **Listar Todas**: `GET /v1/tenant`
 - **Obtener por ID**: `GET /v1/tenant/:id`
 
