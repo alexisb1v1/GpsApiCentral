@@ -2,7 +2,7 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { Result, ok, err } from 'neverthrow';
 import { GetTenantBrandingQuery } from '../get-tenant-branding.query';
-import { TenantRepository } from '../../../../domain/repositories/tenant.repository';
+import { TenantRepository } from '@tenant/domain/repositories/tenant.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { TenantBrandingResponseDto } from '../dto/tenant-branding.response.dto';
 
