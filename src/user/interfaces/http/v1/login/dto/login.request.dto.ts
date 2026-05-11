@@ -14,5 +14,6 @@ export class LoginRequestDto {
 }
 
 export class LoginResponseDto {
+  @ApiProperty()
   accessToken: string;
 }

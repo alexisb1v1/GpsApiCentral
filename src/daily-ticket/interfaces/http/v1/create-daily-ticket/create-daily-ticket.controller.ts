@@ -1,7 +1,8 @@
 import { Controller, Post, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { CreateDailyTicketRequestDto } from '@daily-ticket/application/commands/v1/create-daily-ticket/dto/create-daily-ticket.request.dto';
+import { CreateDailyTicketResponseDto } from './dto/create-daily-ticket.response.dto';
 import { CreateDailyTicketCommand } from '@daily-ticket/application/commands/v1/create-daily-ticket/create-daily-ticket.command';
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
@@ -14,6 +15,7 @@ export class CreateDailyTicketController {
 
   @Post('create')
   @ApiOperation({ summary: 'Registrar el pago de salida diaria de un vehículo' })
+  @ApiResponse({ status: 201, type: CreateDailyTicketResponseDto })
   async execute(
     @Body() dto: CreateDailyTicketRequestDto,
     @Req() req: any,

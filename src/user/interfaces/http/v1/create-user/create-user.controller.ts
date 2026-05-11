@@ -1,7 +1,8 @@
 import { Controller, Post, Body, Req } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { CreateUserRequestDto } from './dto/create-user.request.dto';
+import { CreateUserResponseDto } from './dto/create-user.response.dto';
 import { CreateUserCommand } from '@user/application/commands/v1/create-user/create-user.command';
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
@@ -14,6 +15,7 @@ export class CreateUserController {
 
   @Post('create')
   @ApiOperation({ summary: 'Crear un nuevo usuario' })
+  @ApiResponse({ status: 201, type: CreateUserResponseDto })
   async execute(
     @Body() dto: CreateUserRequestDto,
     @Req() req: any,

@@ -1,12 +1,31 @@
+import { ApiProperty } from '@nestjs/swagger';
+
 export class CreateTenantResponseDto {
+  @ApiProperty()
   id: string;
+
+  @ApiProperty()
   name: string;
+
+  @ApiProperty()
   subdomain: string;
+
+  @ApiProperty()
   isActive: boolean;
+
+  @ApiProperty({ required: false, nullable: true })
   logoUrl: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
   primaryColor: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
   accentColor: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
   statusDotColor: string | null;
+
+  @ApiProperty()
   createdAt: Date;
 
   constructor(data: any) {
