@@ -1,4 +1,4 @@
-import { RouteStopItemDto } from '../../../../interfaces/http/v1/update-route-stops/dto/update-route-stops.request.dto';
+import { RouteStopItemDto } from '@route/interfaces/http/v1/update-route-stops/dto/update-route-stops.request.dto';
 
 export class UpdateRouteStopsCommand {
   constructor(

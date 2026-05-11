@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { GeofenceEntity } from '@geofence/domain/entities/geofence.entity';
+import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 
 export enum TrackingEventType {
   ENTER = 'geofenceEnter',
@@ -20,6 +21,9 @@ export class TrackingEventEntity {
 
   @Column({ name: 'geofence_id', type: 'uuid', nullable: true })
   geofenceId: string;
+
+  @Column({ name: 'round_id', type: 'uuid', nullable: true })
+  roundId: string;
 
   @Column({
     type: 'enum',
@@ -46,4 +50,8 @@ export class TrackingEventEntity {
   @ManyToOne(() => GeofenceEntity)
   @JoinColumn({ name: 'geofence_id' })
   geofence: GeofenceEntity;
+
+  @ManyToOne(() => DailyRoundEntity)
+  @JoinColumn({ name: 'round_id' })
+  round: DailyRoundEntity;
 }

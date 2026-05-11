@@ -1,10 +1,10 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { GetRoutesListQuery } from '../../../../application/queries/v1/get-routes-list/get-routes-list.query';
-import { matchResult } from '../../../../../common/http/match-result';
-import { CurrentUser, UserContext } from '../../../../../shared/infrastructure/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../../../../shared/infrastructure/guards/jwt-auth.guard';
+import { GetRoutesListQuery } from '@route/application/queries/v1/get-routes-list/get-routes-list.query';
+import { matchResult } from '@common/http/match-result';
+import { CurrentUser, UserContext } from '@shared/infrastructure/decorators/current-user.decorator';
+import { JwtAuthGuard } from '@shared/infrastructure/guards/jwt-auth.guard';
 
 @ApiTags('Route (Gestión de Rutas)')
 @ApiBearerAuth()

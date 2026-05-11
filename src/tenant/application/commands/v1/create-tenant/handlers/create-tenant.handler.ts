@@ -33,6 +33,10 @@ export class CreateTenantHandler implements ICommandHandler<CreateTenantCommand>
     newTenant.name = command.name;
     newTenant.subdomain = command.subdomain;
     newTenant.isActive = command.isActive ?? true;
+    newTenant.logoUrl = command.logoUrl ?? null;
+    newTenant.primaryColor = command.primaryColor ?? null;
+    newTenant.accentColor = command.accentColor ?? null;
+    newTenant.statusDotColor = command.statusDotColor ?? null;
 
     // 3. Guardar en persistencia
     const saveResult = await this.tenantRepository.save(newTenant);
@@ -46,7 +50,15 @@ export class CreateTenantHandler implements ICommandHandler<CreateTenantCommand>
         action: 'CREATE_TENANT',
         entityName: 'tenants',
         entityId: tenant.id,
-        newValues: { id: tenant.id, name: tenant.name, subdomain: tenant.subdomain },
+        newValues: { 
+          id: tenant.id, 
+          name: tenant.name, 
+          subdomain: tenant.subdomain,
+          logoUrl: tenant.logoUrl,
+          primaryColor: tenant.primaryColor,
+          accentColor: tenant.accentColor,
+          statusDotColor: tenant.statusDotColor
+        },
         ipAddress: command.ipAddress,
         userAgent: command.userAgent,
       });

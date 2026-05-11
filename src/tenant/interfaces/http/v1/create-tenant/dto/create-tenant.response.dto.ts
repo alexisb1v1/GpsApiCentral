@@ -3,6 +3,10 @@ export class CreateTenantResponseDto {
   name: string;
   subdomain: string;
   isActive: boolean;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  statusDotColor: string | null;
   createdAt: Date;
 
   constructor(data: any) {
@@ -10,6 +14,10 @@ export class CreateTenantResponseDto {
     this.name = data.name;
     this.subdomain = data.subdomain;
     this.isActive = data.isActive;
+    this.logoUrl = data.logoUrl;
+    this.primaryColor = data.primaryColor;
+    this.accentColor = data.accentColor;
+    this.statusDotColor = data.statusDotColor;
     this.createdAt = data.createdAt;
   }
 }

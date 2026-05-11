@@ -1,6 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Unique } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Unique, Index, OneToMany } from 'typeorm';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { UserEntity } from '@user/domain/entities/user.entity';
+import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
+import { DailyRoundEntity } from './daily-round.entity';
 
 export enum TicketStatus {
   ACTIVE = 'ACTIVE',
@@ -9,6 +11,7 @@ export enum TicketStatus {
 
 @Entity('daily_tickets')
 @Unique(['vehicleId', 'workDate'])
+@Index('idx_daily_tickets_tenant', ['tenantId'])
 export class DailyTicketEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -54,4 +57,11 @@ export class DailyTicketEntity {
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'registered_by' })
   user: UserEntity;
+
+  @ManyToOne(() => TenantEntity)
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: TenantEntity;
+
+  @OneToMany(() => DailyRoundEntity, (round) => round.dailyTicket)
+  rounds: DailyRoundEntity[];
 }

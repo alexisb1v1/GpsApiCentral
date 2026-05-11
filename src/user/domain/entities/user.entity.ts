@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from 'typeorm';
 import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
+import { DriverInfoEntity } from './driver-info.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -28,4 +29,7 @@ export class UserEntity {
     default: RegisterStatus.ACTIVE,
   })
   status: RegisterStatus;
+
+  @OneToOne(() => DriverInfoEntity, (driverInfo) => driverInfo.user)
+  driverInfo: DriverInfoEntity;
 }

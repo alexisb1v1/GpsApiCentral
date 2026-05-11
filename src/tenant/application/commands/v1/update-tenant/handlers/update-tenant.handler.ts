@@ -21,7 +21,16 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
     if (result.isErr()) return err(result.error);
 
     const tenant = result.value;
-    const oldValues = { id: tenant.id, name: tenant.name, subdomain: tenant.subdomain, isActive: tenant.isActive };
+    const oldValues = { 
+      id: tenant.id, 
+      name: tenant.name, 
+      subdomain: tenant.subdomain, 
+      isActive: tenant.isActive,
+      logoUrl: tenant.logoUrl,
+      primaryColor: tenant.primaryColor,
+      accentColor: tenant.accentColor,
+      statusDotColor: tenant.statusDotColor
+    };
 
     // 2. Si cambia el subdominio, validar que no esté en uso
     if (command.subdomain && command.subdomain !== tenant.subdomain) {
@@ -33,6 +42,10 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
     // 3. Actualizar campos
     if (command.name) tenant.name = command.name;
     if (command.isActive !== undefined) tenant.isActive = command.isActive;
+    if (command.logoUrl !== undefined) tenant.logoUrl = command.logoUrl;
+    if (command.primaryColor !== undefined) tenant.primaryColor = command.primaryColor;
+    if (command.accentColor !== undefined) tenant.accentColor = command.accentColor;
+    if (command.statusDotColor !== undefined) tenant.statusDotColor = command.statusDotColor;
 
     // 4. Guardar
     const saveResult = await this.tenantRepository.save(tenant);
@@ -47,7 +60,16 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
         entityName: 'tenants',
         entityId: updatedTenant.id,
         oldValues,
-        newValues: { id: updatedTenant.id, name: updatedTenant.name, subdomain: updatedTenant.subdomain, isActive: updatedTenant.isActive },
+        newValues: { 
+          id: updatedTenant.id, 
+          name: updatedTenant.name, 
+          subdomain: updatedTenant.subdomain, 
+          isActive: updatedTenant.isActive,
+          logoUrl: updatedTenant.logoUrl,
+          primaryColor: updatedTenant.primaryColor,
+          accentColor: updatedTenant.accentColor,
+          statusDotColor: updatedTenant.statusDotColor
+        },
         ipAddress: command.ipAddress,
         userAgent: command.userAgent,
       });

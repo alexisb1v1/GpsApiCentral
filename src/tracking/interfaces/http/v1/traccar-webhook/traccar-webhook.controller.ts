@@ -2,7 +2,7 @@ import { Controller, Post, Body } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TraccarWebhookRequestDto } from './dto/traccar-webhook.request.dto';
-import { ProcessTraccarWebhookCommand } from '../../../../application/commands/v1/process-traccar-webhook/process-traccar-webhook.command';
+import { ProcessTraccarWebhookCommand } from '@tracking/application/commands/v1/process-traccar-webhook/process-traccar-webhook.command';
 
 @ApiTags('Tracking Webhooks')
 @Controller('v1/webhook/traccar')
