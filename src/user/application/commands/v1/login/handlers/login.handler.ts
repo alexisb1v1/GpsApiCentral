@@ -21,7 +21,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     private readonly auditService: AuditService,
   ) {}
 
-  async execute(command: LoginCommand): Promise<Result<{ accessToken: string }, AppError>> {
+  async execute(command: LoginCommand): Promise<Result<{ user: { id: string; email: string; name: string }; token: string }, AppError>> {
     // 0. Buscar tenant por subdominio
     const tenantResult = await this.tenantRepository.findBySubdomain(command.tenant);
     if (tenantResult.isErr()) return err('UNAUTHORIZED');
@@ -64,9 +64,14 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       userAgent: command.userAgent,
     });
 
-    // 6. Retornar Token
+    // 6. Retornar Respuesta Completa
     return ok({
-      accessToken: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      token: token,
     });
   }
 }

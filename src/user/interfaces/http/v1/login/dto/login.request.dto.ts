@@ -18,7 +18,21 @@ export class LoginRequestDto {
   tenant: string;
 }
 
-export class LoginResponseDto {
+export class UserResponseDto {
   @ApiProperty()
-  accessToken: string;
+  id: string;
+
+  @ApiProperty()
+  email: string;
+
+  @ApiProperty()
+  name: string;
+}
+
+export class LoginResponseDto {
+  @ApiProperty({ type: UserResponseDto })
+  user: UserResponseDto;
+
+  @ApiProperty()
+  token: string;
 }
