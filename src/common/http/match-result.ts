@@ -9,7 +9,7 @@ import {
 import { Result } from 'neverthrow';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { ERROR_CODES } from '@shared/domain/errors/error-codes';
-import { PaginatedResult } from './interfaces/paginated-result.interface';
+import { PaginatedResult } from '@common/interfaces/paginated-result.interface';
 
 /**
  * Estructura estándar de respuesta de la API
