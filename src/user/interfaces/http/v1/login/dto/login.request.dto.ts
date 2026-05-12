@@ -11,6 +11,11 @@ export class LoginRequestDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @ApiProperty({ example: 'miflota' })
+  @IsString()
+  @IsNotEmpty()
+  tenant: string;
 }
 
 export class LoginResponseDto {

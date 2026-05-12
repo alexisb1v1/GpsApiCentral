@@ -22,7 +22,7 @@ export class LoginController {
     @Audit() audit: AuditContext,
   ) {
     const result = await this.commandBus.execute(
-      new LoginCommand(dto.email, dto.password, audit.ip, audit.userAgent)
+      new LoginCommand(dto.email, dto.password, dto.tenant, audit.ip, audit.userAgent)
     );
 
     return matchResult(

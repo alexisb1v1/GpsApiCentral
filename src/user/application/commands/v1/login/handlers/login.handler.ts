@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { LoginCommand } from '../login.command';
 import { UserRepository } from '@user/domain/repositories/user.repository';
+import { TenantRepository } from '@tenant/domain/repositories/tenant.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
@@ -14,16 +15,26 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
   constructor(
     @Inject('UserRepository')
     private readonly userRepository: UserRepository,
+    @Inject('TenantRepository')
+    private readonly tenantRepository: TenantRepository,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
   ) {}
 
   async execute(command: LoginCommand): Promise<Result<{ accessToken: string }, AppError>> {
+    // 0. Buscar tenant por subdominio
+    const tenantResult = await this.tenantRepository.findBySubdomain(command.tenant);
+    if (tenantResult.isErr()) return err('UNAUTHORIZED');
+    const tenant = tenantResult.value;
+
     // 1. Buscar usuario por email
     const result = await this.userRepository.findByEmail(command.email);
     if (result.isErr()) return err('UNAUTHORIZED');
 
     const user = result.value;
+
+    // 1.1 Validar que el usuario pertenece al tenant
+    if (user.tenantId !== tenant.id) return err('UNAUTHORIZED');
 
     // 2. Validar si está activo (Usando RegisterStatus.ACTIVE)
     if (user.status !== RegisterStatus.ACTIVE) return err('UNAUTHORIZED');
