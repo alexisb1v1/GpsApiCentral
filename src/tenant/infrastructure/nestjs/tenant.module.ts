@@ -9,6 +9,7 @@ import { SoftDeleteTenantHandler } from '@tenant/application/commands/v1/soft-de
 import { GetTenantByIdHandler } from '@tenant/application/queries/v1/get-tenant-by-id/handlers/get-tenant-by-id.handler';
 import { GetTenantsListHandler } from '@tenant/application/queries/v1/get-tenants-list/handlers/get-tenants-list.handler';
 import { GetTenantBrandingHandler } from '@tenant/application/queries/v1/get-tenant-branding/handlers/get-tenant-branding.handler';
+import { VerifyTenantDomainHandler } from '@tenant/application/queries/v1/verify-tenant-domain/handlers/verify-tenant-domain.handler';
 
 import { CreateTenantController } from '@tenant/interfaces/http/v1/create-tenant/create-tenant.controller';
 import { UpdateTenantController } from '@tenant/interfaces/http/v1/update-tenant/update-tenant.controller';
@@ -16,6 +17,7 @@ import { SoftDeleteTenantController } from '@tenant/interfaces/http/v1/soft-dele
 import { GetTenantByIdController } from '@tenant/interfaces/http/v1/get-tenant-by-id/get-tenant-by-id.controller';
 import { GetTenantsListController } from '@tenant/interfaces/http/v1/get-tenants-list/get-tenants-list.controller';
 import { GetTenantBrandingController } from '@tenant/interfaces/http/v1/get-tenant-branding/get-tenant-branding.controller';
+import { VerifyTenantDomainController } from '@tenant/interfaces/http/v1/verify-tenant-domain/verify-tenant-domain.controller';
 
 const Handlers = [
   CreateTenantHandler,
@@ -24,6 +26,7 @@ const Handlers = [
   GetTenantByIdHandler,
   GetTenantsListHandler,
   GetTenantBrandingHandler,
+  VerifyTenantDomainHandler,
 ];
 
 const Repositories = [
@@ -45,6 +48,7 @@ const Repositories = [
     GetTenantByIdController,
     GetTenantsListController,
     GetTenantBrandingController,
+    VerifyTenantDomainController,
   ],
   providers: [
     ...Repositories,
