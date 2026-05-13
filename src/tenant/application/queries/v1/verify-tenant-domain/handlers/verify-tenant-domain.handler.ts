@@ -14,15 +14,10 @@ export class VerifyTenantDomainHandler implements IQueryHandler<VerifyTenantDoma
 
   async execute(query: VerifyTenantDomainQuery): Promise<Result<void, AppError>> {
     const { fullDomain } = query;
-    const baseDomain = '.centralafbv.com';
 
-    // 1. Verificamos que el dominio termine en el dominio principal
-    if (!fullDomain.endsWith(baseDomain)) {
-      return err('NOT_FOUND');
-    }
-
-    // 2. Extraemos el subdominio
-    const subdomain = fullDomain.replace(baseDomain, '');
+    // 1. Extraemos el subdominio (la parte antes del primer punto)
+    // Ejemplo: "transportesanjuan.centralafbv.com" -> "transportesanjuan"
+    const subdomain = fullDomain.split('.')[0];
 
     if (!subdomain) {
       return err('NOT_FOUND');

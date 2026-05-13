@@ -1,11 +1,10 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { GetTenantsListQuery } from '@tenant/application/queries/v1/get-tenants-list/get-tenants-list.query';
 import { matchResult } from '@common/http/match-result';
 import { CreateTenantResponseDto } from '@tenant/interfaces/http/v1/create-tenant/dto/create-tenant.response.dto';
 import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
-import { Public } from '@shared/infrastructure/decorators/public.decorator';
 
 @ApiTags('Tenant')
 @Controller('v1/tenants')

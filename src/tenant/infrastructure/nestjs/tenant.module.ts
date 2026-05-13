@@ -17,7 +17,6 @@ import { SoftDeleteTenantController } from '@tenant/interfaces/http/v1/soft-dele
 import { GetTenantByIdController } from '@tenant/interfaces/http/v1/get-tenant-by-id/get-tenant-by-id.controller';
 import { GetTenantsListController } from '@tenant/interfaces/http/v1/get-tenants-list/get-tenants-list.controller';
 import { GetTenantBrandingController } from '@tenant/interfaces/http/v1/get-tenant-branding/get-tenant-branding.controller';
-import { VerifyTenantDomainController } from '@tenant/interfaces/http/v1/verify-tenant-domain/verify-tenant-domain.controller';
 
 const Handlers = [
   CreateTenantHandler,
@@ -48,7 +47,6 @@ const Repositories = [
     GetTenantByIdController,
     GetTenantsListController,
     GetTenantBrandingController,
-    VerifyTenantDomainController,
   ],
   providers: [
     ...Repositories,
