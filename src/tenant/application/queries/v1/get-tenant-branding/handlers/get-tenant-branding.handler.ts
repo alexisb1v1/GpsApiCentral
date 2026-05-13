@@ -21,6 +21,10 @@ export class GetTenantBrandingHandler implements IQueryHandler<GetTenantBranding
     }
 
     const tenant = tenantResult.value;
+
+    if (!tenant.isActive) {
+      return err('FORBIDDEN');
+    }
     
     // Solo devolvemos los datos de branding
     return ok(new TenantBrandingResponseDto({
