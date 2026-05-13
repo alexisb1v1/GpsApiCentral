@@ -13,7 +13,7 @@ import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-con
 export class CreateTenantController {
   constructor(private readonly commandBus: CommandBus) {}
 
-  @Post('create')
+  @Post()
   @ApiOperation({ summary: 'Crear una nueva empresa (Tenant)' })
   @ApiResponse({ status: 201, type: CreateTenantResponseDto })
   async execute(

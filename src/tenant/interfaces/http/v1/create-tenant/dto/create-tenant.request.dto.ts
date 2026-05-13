@@ -1,5 +1,6 @@
 import { IsString, IsNotEmpty, IsOptional, IsBoolean, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { IsRuc } from '@/shared/decorators/is-ruc.decorator';
 
 export class CreateTenantRequestDto {
   @ApiProperty({ example: 'Empresa Demo', description: 'Nombre de la empresa' })
@@ -55,7 +56,7 @@ export class CreateTenantRequestDto {
 
   @ApiProperty({ example: '20123456789', required: false })
   @IsString()
-  @IsOptional()
-  @MaxLength(20)
-  taxId?: string;
+  @IsNotEmpty()
+  @IsRuc()
+  taxId: string;
 }
