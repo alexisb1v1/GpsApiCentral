@@ -27,6 +27,7 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
       subdomain: tenant.subdomain, 
       isActive: tenant.isActive,
       logoUrl: tenant.logoUrl,
+      loginUrl: tenant.loginUrl,
       primaryColor: tenant.primaryColor,
       accentColor: tenant.accentColor,
       statusDotColor: tenant.statusDotColor,
@@ -46,6 +47,7 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
     if (command.name) tenant.name = command.name;
     if (command.isActive !== undefined) tenant.isActive = command.isActive;
     if (command.logoUrl !== undefined) tenant.logoUrl = command.logoUrl;
+    if (command.loginUrl !== undefined) tenant.loginUrl = command.loginUrl;
     if (command.primaryColor !== undefined) tenant.primaryColor = command.primaryColor;
     if (command.accentColor !== undefined) tenant.accentColor = command.accentColor;
     if (command.statusDotColor !== undefined) tenant.statusDotColor = command.statusDotColor;

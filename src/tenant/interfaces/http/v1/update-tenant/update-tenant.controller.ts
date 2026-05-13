@@ -27,6 +27,7 @@ export class UpdateTenantController {
         dto.subdomain,
         dto.isActive,
         dto.logoUrl,
+        dto.loginUrl,
         dto.primaryColor,
         dto.accentColor,
         dto.statusDotColor,

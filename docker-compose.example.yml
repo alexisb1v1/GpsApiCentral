@@ -13,8 +13,12 @@ services:
       DB_PASSWORD: your_db_password
       DB_NAME: your_db_name
       NODE_ENV: production
-      JWT_SECRET: your_jwt_secret
+      JWT_SECRET: your_jwt_secret_key
       JWT_EXPIRATION: 24h
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
     networks:
       - caddy_net
 

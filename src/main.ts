@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './shared/infrastructure/exceptions/global-exception.filter';
 
@@ -17,6 +18,9 @@ async function bootstrap() {
   // Seguridad
   app.use(helmet());
   app.enableCors();
+
+  // Archivos Estáticos
+  app.useStaticAssets(join(__dirname, '..', 'public'));
 
   // Prefijo global
   app.setGlobalPrefix('api');

@@ -14,6 +14,7 @@ import { DailyTicketModule } from './daily-ticket/infrastructure/nestjs/daily-ti
 import { GeofenceModule } from './geofence/infrastructure/nestjs/geofence.module';
 import { RouteModule } from './route/infrastructure/nestjs/route.module';
 import { TrackingModule } from './tracking/infrastructure/nestjs/tracking.module';
+import { StorageModule } from '@shared/infrastructure/storage/storage.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { TrackingModule } from './tracking/infrastructure/nestjs/tracking.module
     GeofenceModule,
     RouteModule,
     TrackingModule,
+    StorageModule,
     // Aquí se importarán los módulos de dominio (ej. GpsModule)
   ],
   controllers: [HealthCheckController],

@@ -34,6 +34,7 @@ export class CreateTenantHandler implements ICommandHandler<CreateTenantCommand>
     newTenant.subdomain = command.subdomain;
     newTenant.isActive = command.isActive ?? true;
     newTenant.logoUrl = command.logoUrl ?? null;
+    newTenant.loginUrl = command.loginUrl ?? null;
     newTenant.primaryColor = command.primaryColor ?? null;
     newTenant.accentColor = command.accentColor ?? null;
     newTenant.statusDotColor = command.statusDotColor ?? null;

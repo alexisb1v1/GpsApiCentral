@@ -4,6 +4,7 @@ export class CreateTenantCommand {
     public readonly subdomain: string,
     public readonly isActive?: boolean,
     public readonly logoUrl?: string,
+    public readonly loginUrl?: string,
     public readonly primaryColor?: string,
     public readonly accentColor?: string,
     public readonly statusDotColor?: string,

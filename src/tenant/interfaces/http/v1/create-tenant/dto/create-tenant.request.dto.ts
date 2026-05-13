@@ -25,6 +25,11 @@ export class CreateTenantRequestDto {
   @IsOptional()
   logoUrl?: string;
 
+  @ApiProperty({ example: 'https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885__480.jpg', required: false })
+  @IsString()
+  @IsOptional()
+  loginUrl?: string;
+
   @ApiProperty({ example: '#3f51b5', required: false })
   @IsString()
   @IsOptional()
