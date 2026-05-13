@@ -17,6 +17,9 @@ export class TenantEntity {
   @Column({ name: 'logo_url', type: 'text', nullable: true })
   logoUrl: string | null;
 
+  @Column({ name: 'login_url', type: 'text', nullable: true })
+  loginUrl: string | null;
+
   @Column({ name: 'primary_color', type: 'varchar', length: 7, nullable: true })
   primaryColor: string | null;
 

@@ -8,6 +8,9 @@ export class TenantBrandingResponseDto {
   logoUrl: string | null;
 
   @ApiProperty({ required: false, nullable: true })
+  loginUrl: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
   primaryColor: string | null;
 
   @ApiProperty({ required: false, nullable: true })
@@ -19,6 +22,7 @@ export class TenantBrandingResponseDto {
   constructor(data: any) {
     this.name = data.name;
     this.logoUrl = data.logoUrl;
+    this.loginUrl = data.loginUrl;
     this.primaryColor = data.primaryColor;
     this.accentColor = data.accentColor;
     this.statusDotColor = data.statusDotColor;

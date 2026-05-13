@@ -26,6 +26,7 @@ export class GetTenantBrandingHandler implements IQueryHandler<GetTenantBranding
     return ok(new TenantBrandingResponseDto({
       name: tenant.name,
       logoUrl: tenant.logoUrl,
+      loginUrl: tenant.loginUrl,
       primaryColor: tenant.primaryColor,
       accentColor: tenant.accentColor,
       statusDotColor: tenant.statusDotColor,
