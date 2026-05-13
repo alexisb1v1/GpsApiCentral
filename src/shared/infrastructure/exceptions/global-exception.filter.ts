@@ -31,8 +31,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       
       // Manejar respuestas estructuradas (como las de matchResult)
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        message = (exceptionResponse as any).message || message;
-        errorCode = (exceptionResponse as any).errorCode || 'ERR_UNKNOWN';
+        const resp = exceptionResponse as any;
+        message = resp.errorMessage || resp.message || message;
+        errorCode = resp.errorCode || errorCode;
       } else {
         message = exception.message;
       }
