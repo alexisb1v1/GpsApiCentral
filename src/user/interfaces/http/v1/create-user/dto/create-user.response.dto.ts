@@ -16,11 +16,15 @@ export class CreateUserResponseDto {
   @ApiProperty()
   role: string;
 
+  @ApiProperty()
+  createdAt: Date;
+
   constructor(data: any) {
     this.id = data.id;
     this.tenantId = data.tenantId;
     this.name = data.name;
     this.email = data.email;
     this.role = data.role;
+    this.createdAt = data.createdAt;
   }
 }

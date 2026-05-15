@@ -27,6 +27,7 @@ export class UpdateUserController {
         dto.email,
         dto.role,
         dto.isActive,
+        undefined,
         req.user.sub,
         audit.ip,
         audit.userAgent,

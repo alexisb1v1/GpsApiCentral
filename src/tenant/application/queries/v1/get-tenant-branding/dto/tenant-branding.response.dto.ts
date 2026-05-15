@@ -19,7 +19,11 @@ export class TenantBrandingResponseDto {
   @ApiProperty({ required: false, nullable: true })
   statusDotColor: string | null;
 
+  @ApiProperty()
+  id: string;
+
   constructor(data: any) {
+    this.id = data.id;
     this.name = data.name;
     this.logoUrl = data.logoUrl;
     this.loginUrl = data.loginUrl;

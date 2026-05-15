@@ -44,7 +44,11 @@ export class TypeOrmUserRepository implements UserRepository {
 
   async findByTenantId(tenantId: string): Promise<Result<UserEntity[], AppError>> {
     try {
-      const users = await this.repository.find({ where: { tenantId } });
+      const where = tenantId ? { tenantId } : {};
+      const users = await this.repository.find({ 
+        where,
+        order: { createdAt: 'DESC' }
+      });
       return ok(users);
     } catch (error) {
       return err('INTERNAL_ERROR');

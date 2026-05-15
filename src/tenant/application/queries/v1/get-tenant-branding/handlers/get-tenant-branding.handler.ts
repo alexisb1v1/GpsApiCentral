@@ -28,6 +28,7 @@ export class GetTenantBrandingHandler implements IQueryHandler<GetTenantBranding
     
     // Solo devolvemos los datos de branding
     return ok(new TenantBrandingResponseDto({
+      id: tenant.id,
       name: tenant.name,
       logoUrl: tenant.logoUrl,
       loginUrl: tenant.loginUrl,
