@@ -5,8 +5,8 @@ import { ChangePasswordRequestDto } from './dto/change-password.request.dto';
 import { ChangePasswordCommand } from '@user/application/commands/v1/change-password/change-password.command';
 import { matchResult } from '@common/http/match-result';
 
-@ApiTags('User')
-@Controller('v1/user')
+@ApiTags('Users')
+@Controller('v1/users')
 export class ChangePasswordController {
   constructor(private readonly commandBus: CommandBus) {}
 

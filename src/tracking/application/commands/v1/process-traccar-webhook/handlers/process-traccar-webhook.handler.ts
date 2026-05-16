@@ -34,7 +34,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     const { event, device, position } = payload;
 
     // 1. Buscar Vehículo por IMEI
-    const vehicleResult = await this.vehicleRepository.findByTraccarId(device.uniqueId);
+    const vehicleResult = await this.vehicleRepository.findByTraccarId(parseInt(device.uniqueId));
     if (vehicleResult.isErr()) return;
     const vehicle = vehicleResult.value;
 

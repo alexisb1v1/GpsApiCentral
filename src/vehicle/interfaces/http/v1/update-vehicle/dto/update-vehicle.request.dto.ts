@@ -8,23 +8,12 @@ export class UpdateVehicleRequestDto {
   @MaxLength(20)
   plate: string;
 
-  @ApiProperty({ example: '123456789012345', required: false })
-  @IsString()
+  @ApiProperty({ example: 12345, required: false })
+  @IsInt()
   @IsOptional()
-  @MaxLength(50)
-  traccarDeviceId?: string;
+  traccarDeviceId?: number;
 
-  @ApiProperty({ example: 'Toyota' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  brand: string;
 
-  @ApiProperty({ example: 'Corolla' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  model: string;
 
   @ApiProperty({ example: 2024 })
   @IsInt()
@@ -32,9 +21,33 @@ export class UpdateVehicleRequestDto {
   @Max(new Date().getFullYear() + 1)
   year: number;
 
-  @ApiProperty({ example: 'Blanco', required: false })
+
+
+  @ApiProperty({ example: 40, required: false })
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  passengerCapacity?: number;
+
+  @ApiProperty({ example: 'Juan Perez', required: false })
   @IsString()
   @IsOptional()
-  @MaxLength(30)
-  color?: string;
+  @MaxLength(150)
+  ownerName?: string;
+
+  @ApiProperty({ example: '987654321', required: false })
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  ownerPhone?: string;
+
+  @ApiProperty({ example: 'OPERATIVO', enum: ['OPERATIVO', 'TALLER', 'BAJA'], required: false })
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @ApiProperty({ example: 'uuid-v4', required: false })
+  @IsString()
+  @IsOptional()
+  tenantId?: string;
 }

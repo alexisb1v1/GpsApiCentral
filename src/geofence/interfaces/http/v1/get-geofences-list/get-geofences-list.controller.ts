@@ -6,10 +6,10 @@ import { matchResult } from '@common/http/match-result';
 import { CurrentUser, UserContext } from '@shared/infrastructure/decorators/current-user.decorator';
 import { JwtAuthGuard } from '@shared/infrastructure/guards/jwt-auth.guard';
 
-@ApiTags('Geofence (Puntos de Control)')
+@ApiTags('Geofences')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('v1/geofence')
+@Controller('v1/geofences')
 export class GetGeofencesListController {
   constructor(private readonly queryBus: QueryBus) {}
 

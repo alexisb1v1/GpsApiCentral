@@ -15,20 +15,15 @@ export class VehicleEntity {
   @Column({ type: 'varchar', length: 20, unique: true })
   plate: string;
 
-  @Column({ name: 'traccar_device_id', type: 'varchar', length: 50, unique: true, nullable: true })
-  traccarDeviceId: string | null;
+  @Column({ name: 'traccar_device_id', type: 'int', unique: true, nullable: true })
+  traccarDeviceId: number | null;
 
-  @Column({ type: 'varchar', length: 50 })
-  brand: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  model: string;
 
-  @Column({ type: 'int' })
+  @Column({ name: 'manufacturing_year', type: 'int' })
   year: number;
 
-  @Column({ type: 'varchar', length: 30, nullable: true })
-  color: string | null;
+
 
   @Column({
     type: 'enum',
@@ -37,11 +32,19 @@ export class VehicleEntity {
   })
   status: VehicleStatus;
 
+  @Column({ name: 'passenger_capacity', type: 'int', nullable: true })
+  passengerCapacity: number | null;
+
+  @Column({ name: 'owner_name', type: 'varchar', length: 150, nullable: true })
+  ownerName: string | null;
+
+  @Column({ name: 'owner_phone', type: 'varchar', length: 20, nullable: true })
+  ownerPhone: string | null;
+
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
 
-  @Column({ name: 'is_active', type: 'boolean', default: true })
-  isActive: boolean;
+
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

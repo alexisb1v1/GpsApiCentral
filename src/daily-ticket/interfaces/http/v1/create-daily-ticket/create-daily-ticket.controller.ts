@@ -7,9 +7,9 @@ import { CreateDailyTicketCommand } from '@daily-ticket/application/commands/v1/
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 
-@ApiTags('Daily Tickets (Salidas)')
+@ApiTags('Daily Tickets')
 @ApiBearerAuth()
-@Controller('v1/daily-ticket')
+@Controller('v1/daily-tickets')
 export class CreateDailyTicketController {
   constructor(private readonly commandBus: CommandBus) {}
 

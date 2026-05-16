@@ -25,12 +25,14 @@ export class CreateVehicleController {
       new CreateVehicleCommand(
         dto.plate,
         dto.traccarDeviceId || null,
-        dto.brand,
-        dto.model,
         dto.year,
         dto.tenantId,
         req.user.sub,
-        dto.color,
+
+        dto.passengerCapacity,
+        dto.ownerName,
+        dto.ownerPhone,
+        dto.status,
         audit.ip,
         audit.userAgent,
       ),

@@ -34,10 +34,14 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
     // 3. Actualizar campos
     vehicle.plate = command.plate;
     vehicle.traccarDeviceId = command.traccarDeviceId ?? null;
-    vehicle.brand = command.brand;
-    vehicle.model = command.model;
     vehicle.year = command.year;
-    vehicle.color = command.color ?? null;
+
+    vehicle.passengerCapacity = command.passengerCapacity ?? null;
+    vehicle.ownerName = command.ownerName ?? null;
+    vehicle.ownerPhone = command.ownerPhone ?? null;
+    if (command.status) {
+      vehicle.status = command.status as any;
+    }
 
     // 4. Guardar
     const saveResult = await this.vehicleRepository.save(vehicle);

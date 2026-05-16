@@ -18,6 +18,7 @@ export class TypeOrmVehicleRepository implements VehicleRepository {
       const savedVehicle = await this.repository.save(vehicle);
       return ok(savedVehicle);
     } catch (error) {
+      console.error('Error saving vehicle:', error);
       return err('INTERNAL_ERROR');
     }
   }
@@ -42,7 +43,7 @@ export class TypeOrmVehicleRepository implements VehicleRepository {
     }
   }
 
-  async findByTraccarId(traccarDeviceId: string): Promise<Result<VehicleEntity, AppError>> {
+  async findByTraccarId(traccarDeviceId: number): Promise<Result<VehicleEntity, AppError>> {
     try {
       const vehicle = await this.repository.findOne({ where: { traccarDeviceId } });
       if (!vehicle) return err('NOT_FOUND');
@@ -52,11 +53,17 @@ export class TypeOrmVehicleRepository implements VehicleRepository {
     }
   }
 
-  async findAllByTenant(tenantId: string): Promise<Result<VehicleEntity[], AppError>> {
+  async findAllByTenant(tenantId?: string): Promise<Result<VehicleEntity[], AppError>> {
     try {
-      const vehicles = await this.repository.find({ where: { tenantId } });
+      const where = tenantId ? { tenantId } : {};
+      const vehicles = await this.repository.find({ 
+        where,
+        relations: ['tenant'],
+        order: { createdAt: 'DESC' }
+      });
       return ok(vehicles);
     } catch (error) {
+      console.error('Error in findAllByTenant:', error);
       return err('INTERNAL_ERROR');
     }
   }

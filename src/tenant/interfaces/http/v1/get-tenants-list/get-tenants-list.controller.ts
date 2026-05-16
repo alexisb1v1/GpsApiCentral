@@ -6,7 +6,7 @@ import { matchResult } from '@common/http/match-result';
 import { CreateTenantResponseDto } from '@tenant/interfaces/http/v1/create-tenant/dto/create-tenant.response.dto';
 import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
 
-@ApiTags('Tenant')
+@ApiTags('Tenants')
 @Controller('v1/tenants')
 export class GetTenantsListController {
   constructor(private readonly queryBus: QueryBus) {}

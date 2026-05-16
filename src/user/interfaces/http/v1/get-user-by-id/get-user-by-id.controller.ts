@@ -5,8 +5,8 @@ import { GetUserByIdQuery } from '@user/application/queries/v1/get-user-by-id/ge
 import { matchResult } from '@common/http/match-result';
 import { CreateUserResponseDto } from '@user/interfaces/http/v1/create-user/dto/create-user.response.dto';
 
-@ApiTags('User')
-@Controller('v1/user')
+@ApiTags('Users')
+@Controller('v1/users')
 export class GetUserByIdController {
   constructor(private readonly queryBus: QueryBus) {}
 

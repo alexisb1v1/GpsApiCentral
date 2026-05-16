@@ -67,8 +67,8 @@ const Repositories = [
     CreateUserController,
     UpdateUserController,
     SoftDeleteUserController,
-    GetUserByIdController,
-    GetUsersByTenantController,
+    GetUsersByTenantController,   // ← primero: ruta específica /users/tenant
+    GetUserByIdController,        // ← después: wildcard /users/:id
     LoginController,
     ResetPasswordController,
     ChangePasswordController,

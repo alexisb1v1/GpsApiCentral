@@ -6,10 +6,10 @@ import { matchResult } from '@common/http/match-result';
 import { CurrentUser, UserContext } from '@shared/infrastructure/decorators/current-user.decorator';
 import { JwtAuthGuard } from '@shared/infrastructure/guards/jwt-auth.guard';
 
-@ApiTags('Route (Gestión de Rutas)')
+@ApiTags('Routes')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('v1/route')
+@Controller('v1/routes')
 export class GetRoutesListController {
   constructor(private readonly queryBus: QueryBus) {}
 

@@ -4,20 +4,16 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { GetVehiclesListQuery } from '@vehicle/application/queries/v1/get-vehicles-list/get-vehicles-list.query';
 import { matchResult } from '@common/http/match-result';
 
-@ApiTags('Vehicle')
-@Controller('v1/vehicle')
+@ApiTags('Vehicles')
+@Controller('v1/vehicles')
 export class GetVehiclesListController {
   constructor(private readonly queryBus: QueryBus) {}
 
-  @Get('list')
+  @Get()
   @ApiOperation({ summary: 'Obtener listado de vehículos de un tenant' })
   @ApiResponse({ status: 200, description: 'Listado de vehículos' })
   async execute(@Query('tenantId') tenantId: string) {
     const result = await this.queryBus.execute(new GetVehiclesListQuery(tenantId));
-    return matchResult(result, (vehicles) => ({
-      success: true,
-      message: 'Listado de vehículos obtenido correctamente',
-      data: vehicles,
-    }));
+    return matchResult(result);
   }
 }

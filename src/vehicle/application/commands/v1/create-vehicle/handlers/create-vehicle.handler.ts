@@ -32,12 +32,16 @@ export class CreateVehicleHandler implements ICommandHandler<CreateVehicleComman
     const newVehicle = new VehicleEntity();
     newVehicle.plate = command.plate;
     newVehicle.traccarDeviceId = command.traccarDeviceId ?? null;
-    newVehicle.brand = command.brand;
-    newVehicle.model = command.model;
     newVehicle.year = command.year;
     newVehicle.tenantId = command.tenantId;
-    newVehicle.color = command.color ?? null;
-    newVehicle.isActive = true;
+
+    newVehicle.passengerCapacity = command.passengerCapacity ?? null;
+    newVehicle.ownerName = command.ownerName ?? null;
+    newVehicle.ownerPhone = command.ownerPhone ?? null;
+    if (command.status) {
+      newVehicle.status = command.status as any;
+    }
+
 
     // 3. Guardar en persistencia
     const saveResult = await this.vehicleRepository.save(newVehicle);

@@ -5,8 +5,8 @@ import { ResetPasswordRequestDto } from './dto/reset-password.request.dto';
 import { ResetPasswordCommand } from '@user/application/commands/v1/reset-password/reset-password.command';
 import { matchResult } from '@common/http/match-result';
 
-@ApiTags('User Admin')
-@Controller('v1/user')
+@ApiTags('Users')
+@Controller('v1/users')
 export class ResetPasswordController {
   constructor(private readonly commandBus: CommandBus) {}
 

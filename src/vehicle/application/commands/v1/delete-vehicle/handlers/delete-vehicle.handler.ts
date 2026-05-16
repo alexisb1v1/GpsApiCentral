@@ -23,9 +23,8 @@ export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleComman
     const vehicle = result.value;
     const oldValues = { ...vehicle };
 
-    // 2. Eliminación lógica (Estado BAJA y desactivar)
+    // 2. Eliminación lógica (Estado BAJA)
     vehicle.status = VehicleStatus.BAJA;
-    vehicle.isActive = false;
 
     // 3. Guardar
     const saveResult = await this.vehicleRepository.save(vehicle);
@@ -39,7 +38,7 @@ export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleComman
         entityName: 'vehicles',
         entityId: vehicle.id,
         oldValues: oldValues,
-        newValues: { status: vehicle.status, isActive: vehicle.isActive },
+        newValues: { status: vehicle.status },
         ipAddress: command.ipAddress,
         userAgent: command.userAgent,
       });

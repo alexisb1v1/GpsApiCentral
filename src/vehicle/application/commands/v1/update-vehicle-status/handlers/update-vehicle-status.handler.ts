@@ -33,13 +33,6 @@ export class UpdateVehicleStatusHandler implements ICommandHandler<UpdateVehicle
 
     // 2. Actualizar el estado
     vehicle.status = command.status;
-    
-    // Opcional: Mantener sincronizado isActive
-    if (command.status === VehicleStatus.BAJA) {
-      vehicle.isActive = false;
-    } else {
-      vehicle.isActive = true;
-    }
 
     // 3. Guardar cambios
     const saveResult = await this.vehicleRepository.save(vehicle);

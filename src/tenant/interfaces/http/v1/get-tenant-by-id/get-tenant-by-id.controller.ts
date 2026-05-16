@@ -8,7 +8,7 @@ import { Public } from '@shared/infrastructure/decorators/public.decorator';
 import { Response } from 'express';
 import { VerifyTenantDomainQuery } from '@tenant/application/queries/v1/verify-tenant-domain/verify-tenant-domain.query';
 
-@ApiTags('Tenant')
+@ApiTags('Tenants')
 @Controller('v1/tenants')
 export class GetTenantByIdController {
   constructor(private readonly queryBus: QueryBus) {}
