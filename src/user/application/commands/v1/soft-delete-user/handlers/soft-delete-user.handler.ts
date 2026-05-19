@@ -24,6 +24,11 @@ export class SoftDeleteUserHandler implements ICommandHandler<SoftDeleteUserComm
 
     user.status = RegisterStatus.DELETE;
 
+    // Sincronizar el estado del chofer si el rol es DRIVER y tiene ficha de conductor
+    if (user.role === 'DRIVER' && user.driverInfo) {
+      user.driverInfo.status = RegisterStatus.DELETE;
+    }
+
     const saveResult = await this.userRepository.save(user);
     if (saveResult.isErr()) return err(saveResult.error);
 

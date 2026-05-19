@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, CreateDateColumn } from 'typeorm';
 import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
-import { DriverInfoEntity } from './driver-info.entity';
+import { DriverInfoEntity } from '@driver/domain/entities/driver-info.entity';
 
 @Entity('users')
 export class UserEntity {
@@ -30,7 +30,7 @@ export class UserEntity {
   })
   status: RegisterStatus;
 
-  @OneToOne(() => DriverInfoEntity, (driverInfo) => driverInfo.user)
+  @OneToOne(() => DriverInfoEntity, (driverInfo) => driverInfo.user, { cascade: true })
   driverInfo: DriverInfoEntity;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

@@ -21,9 +21,6 @@ export class GetRouteDetailController {
       new GetRouteDetailQuery(id, user.tenantId),
     );
 
-    return matchResult(result, (route) => ({
-      success: true,
-      data: route,
-    }));
+    return matchResult(result);
   }
 }

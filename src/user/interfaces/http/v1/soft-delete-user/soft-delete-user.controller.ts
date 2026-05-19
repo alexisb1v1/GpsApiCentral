@@ -9,7 +9,7 @@ import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-con
 @ApiBearerAuth()
 @Controller('v1/users')
 export class SoftDeleteUserController {
-  constructor(private readonly commandBus: CommandBus) {}
+  constructor(private readonly commandBus: CommandBus) { }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Desactivar un usuario (Soft Delete)' })
@@ -18,10 +18,14 @@ export class SoftDeleteUserController {
     @Req() req: any,
     @Audit() audit: AuditContext,
   ) {
+    const tenantId = req.user?.tenantId;
+    const userId = req.user?.sub;
+
     const result = await this.commandBus.execute(
       new SoftDeleteUserCommand(
         id,
-        req.user.sub,
+        tenantId,
+        userId,
         audit.ip,
         audit.userAgent,
       ),

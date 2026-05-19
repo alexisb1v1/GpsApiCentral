@@ -28,6 +28,9 @@ export class UpdateRouteStopsController {
         req.user.sub,
         audit.ip,
         audit.userAgent,
+        dto.name,
+        dto.isActive,
+        dto.coordinates,
       ),
     );
 

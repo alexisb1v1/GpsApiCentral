@@ -17,6 +17,9 @@ export class CreateUserResponseDto {
   role: string;
 
   @ApiProperty()
+  isActive: boolean;
+
+  @ApiProperty()
   createdAt: Date;
 
   constructor(data: any) {
@@ -25,6 +28,7 @@ export class CreateUserResponseDto {
     this.name = data.name;
     this.email = data.email;
     this.role = data.role;
+    this.isActive = data.status === 'ACTIVE';
     this.createdAt = data.createdAt;
   }
 }

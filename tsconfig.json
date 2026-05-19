@@ -20,7 +20,8 @@
       "@daily-ticket/*": ["src/daily-ticket/*"],
       "@route/*": ["src/route/*"],
       "@tracking/*": ["src/tracking/*"],
-      "@geofence/*": ["src/geofence/*"]
+      "@geofence/*": ["src/geofence/*"],
+      "@driver/*": ["src/driver/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

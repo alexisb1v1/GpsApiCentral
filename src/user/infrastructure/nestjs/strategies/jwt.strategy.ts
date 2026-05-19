@@ -17,6 +17,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Aquí podrías validar si el usuario aún existe en la BD o si el Tenant sigue activo
     return { 
       userId: payload.sub, 
+      sub: payload.sub,
       email: payload.email, 
       tenantId: payload.tenantId, 
       role: payload.role 

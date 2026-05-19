@@ -7,4 +7,6 @@ export interface UserRepository {
   findById(id: string): Promise<Result<UserEntity, AppError>>;
   findByEmail(email: string): Promise<Result<UserEntity, AppError>>;
   findByTenantId(tenantId: string): Promise<Result<UserEntity[], AppError>>;
+  findDriversByTenantId(tenantId: string): Promise<Result<UserEntity[], AppError>>;
+  findByDniAndTenantId(dni: string, tenantId: string): Promise<Result<UserEntity, AppError>>;
 }

@@ -16,6 +16,9 @@ export class RouteEntity {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
+  @Column({ name: 'coordinates', type: 'jsonb', nullable: true })
+  coordinates?: { lat: number; lng: number }[];
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

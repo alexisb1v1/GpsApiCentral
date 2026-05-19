@@ -5,7 +5,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UserEntity } from '@user/domain/entities/user.entity';
-import { DriverInfoEntity } from '@user/domain/entities/driver-info.entity';
+
 import { TypeOrmUserRepository } from '@user/infrastructure/persistence/typeorm-user.repository';
 import { TenantModule } from '@tenant/infrastructure/nestjs/tenant.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -50,7 +50,7 @@ const Repositories = [
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity, DriverInfoEntity]),
+    TypeOrmModule.forFeature([UserEntity]),
     CqrsModule,
     TenantModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),

@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToOne, JoinColumn } from 'typeorm';
-import { UserEntity } from './user.entity';
+import { UserEntity } from '@user/domain/entities/user.entity';
 import { RegisterStatus } from '@shared/domain/enums/register-status.enum';
 
 @Entity('driver_info')
@@ -20,7 +20,7 @@ export class DriverInfoEntity {
   dni: string;
 
   @Column({ name: 'phone_emergency', type: 'varchar', length: 20, nullable: true })
-  phoneEmergency: string;
+  phoneEmergency: string | null;
 
   @Column({
     type: 'enum',

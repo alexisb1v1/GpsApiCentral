@@ -21,6 +21,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
       const saved = await this.routeRepository.save(route);
       return ok(saved);
     } catch (error) {
+      console.error('Error in save:', error);
       return err('INTERNAL_ERROR');
     }
   }
@@ -34,6 +35,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
       if (!route) return err('NOT_FOUND');
       return ok(route);
     } catch (error) {
+      console.error('Error in findById:', error);
       return err('INTERNAL_ERROR');
     }
   }
@@ -46,6 +48,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
       });
       return ok(routes);
     } catch (error) {
+      console.error('Error in findAllByTenant:', error);
       return err('INTERNAL_ERROR');
     }
   }
@@ -55,6 +58,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
       const result = await this.routeRepository.delete(id);
       return ok(result.affected ? result.affected > 0 : false);
     } catch (error) {
+      console.error('Error in delete:', error);
       return err('INTERNAL_ERROR');
     }
   }
@@ -64,6 +68,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
       const saved = await this.stopRepository.save(stops);
       return ok(saved);
     } catch (error) {
+      console.error('Error in saveStops:', error);
       return err('INTERNAL_ERROR');
     }
   }
@@ -73,6 +78,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
       await this.stopRepository.delete({ routeId });
       return ok(undefined);
     } catch (error) {
+      console.error('Error in deleteStopsByRoute:', error);
       return err('INTERNAL_ERROR');
     }
   }

@@ -20,6 +20,9 @@ export class RouteStopEntity {
   @Column({ name: 'minutes_from_start', type: 'int' })
   minutesFromStart: number;
 
+  @Column({ name: 'coordinates', type: 'jsonb', nullable: true })
+  coordinates?: { lat: number; lng: number }[];
+
   @ManyToOne(() => RouteEntity, (route) => route.stops, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'route_id' })
   route: RouteEntity;

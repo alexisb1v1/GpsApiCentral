@@ -13,6 +13,8 @@ import { UpdateRouteStopsHandler } from '../../application/commands/v1/update-ro
 import { GetRouteDetailController } from '../../interfaces/http/v1/get-route-detail/get-route-detail.controller';
 import { GetRouteDetailHandler } from '../../application/queries/v1/get-route-detail/handlers/get-route-detail.handler';
 import { SharedModule } from '@shared/infrastructure/nestjs/shared.module';
+import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
+import { GeofenceModule } from '@geofence/infrastructure/nestjs/geofence.module';
 
 const Handlers = [
   CreateRouteHandler,
@@ -33,6 +35,8 @@ const Repositories = [
     TypeOrmModule.forFeature([RouteEntity, RouteStopEntity]),
     CqrsModule,
     SharedModule,
+    TraccarModule,
+    GeofenceModule,
   ],
   controllers: [
     CreateRouteController,

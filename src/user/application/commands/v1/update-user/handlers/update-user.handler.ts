@@ -36,6 +36,11 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     if (command.role) user.role = command.role;
     if (command.isActive !== undefined) {
       user.status = command.isActive ? RegisterStatus.ACTIVE : RegisterStatus.DELETE;
+      
+      // Sincronizar el estado del chofer si el rol es DRIVER y tiene ficha de conductor
+      if (user.role === 'DRIVER' && user.driverInfo) {
+        user.driverInfo.status = command.isActive ? RegisterStatus.ACTIVE : RegisterStatus.DELETE;
+      }
     }
 
     // 4. Guardar

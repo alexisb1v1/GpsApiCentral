@@ -39,4 +39,8 @@ export class GeofenceEntity {
   @ManyToOne(() => TenantEntity)
   @JoinColumn({ name: 'tenant_id' })
   tenant: TenantEntity;
+
+  // Propiedades virtuales (no persistidas en BD, se cargan dinámicamente de Traccar)
+  lat?: number;
+  lng?: number;
 }
