@@ -4,9 +4,11 @@ import { Inject } from '@nestjs/common';
 import { CreateDailyTicketCommand } from '../create-daily-ticket.command';
 import { DailyTicketRepository } from '@daily-ticket/domain/repositories/daily-ticket.repository';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { DailyRoundEntity, RoundsStatus } from '@daily-ticket/domain/entities/daily-round.entity';
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
 
 @CommandHandler(CreateDailyTicketCommand)
 export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTicketCommand> {
@@ -16,13 +18,14 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
     @Inject('VehicleRepository')
     private readonly vehicleRepository: VehicleRepository,
     private readonly auditService: AuditService,
-  ) {}
+    private readonly vehicleTenantCache: VehicleTenantCache,
+  ) { }
 
   async execute(command: CreateDailyTicketCommand): Promise<Result<DailyTicketEntity, AppError>> {
     // 1. Validar que el vehículo existe y pertenece al tenant
     const vehicleResult = await this.vehicleRepository.findById(command.vehicleId);
     if (vehicleResult.isErr()) return err(vehicleResult.error);
-    
+
     const vehicle = vehicleResult.value;
     if (vehicle.tenantId !== command.tenantId) {
       return err('FORBIDDEN');
@@ -47,14 +50,30 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
     ticket.totalAmount = command.totalAmount;
     ticket.adminFee = command.adminFee;
     ticket.routeFee = command.routeFee;
-    ticket.workDate = new Date(workDate);
     ticket.status = TicketStatus.ACTIVE;
+    ticket.paymentMethod = command.paymentMethod || 'EFECTIVO';
+    ticket.paymentReference = command.paymentReference || null;
 
     // 5. Guardar
     const saveResult = await this.dailyTicketRepository.save(ticket);
     if (saveResult.isErr()) return err(saveResult.error);
 
     const savedTicket = saveResult.value;
+
+    // 5.0 Crear y guardar la vuelta inicial en daily_rounds
+    const round = new DailyRoundEntity();
+    round.dailyTicketId = savedTicket.id;
+    round.roundNumber = 1;
+    round.direction = command.direction || 'IDA';
+    round.status = RoundsStatus.IN_PROGRESS;
+
+    const roundSaveResult = await this.dailyTicketRepository.saveRound(round);
+    if (roundSaveResult.isErr()) {
+      console.error('Error al guardar la vuelta inicial en daily_rounds:', roundSaveResult.error);
+    }
+
+    // 5.1 Sincronizar en caliente la caché en memoria para monitoreo en tiempo real
+    this.vehicleTenantCache.setDailyTicketId(savedTicket.vehicleId, savedTicket.id);
 
     // 6. Registrar en auditoría
     this.auditService.createLog({

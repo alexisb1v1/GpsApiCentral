@@ -12,11 +12,14 @@ export class VehicleEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 20, unique: true })
+  @Column({ type: 'varchar', length: 20 })
   plate: string;
 
-  @Column({ name: 'traccar_device_id', type: 'int', unique: true, nullable: true })
-  traccarDeviceId: number | null;
+  @Column({ name: 'traccar_device_id', type: 'varchar', length: 50, unique: true, nullable: false })
+  traccarDeviceId: string | null;
+
+  @Column({ name: 'traccar_id', type: 'int', unique: true, nullable: false })
+  traccarId: number | null;
 
 
 
@@ -43,8 +46,6 @@ export class VehicleEntity {
 
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
-
-
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

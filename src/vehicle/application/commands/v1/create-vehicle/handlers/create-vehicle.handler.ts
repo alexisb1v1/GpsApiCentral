@@ -6,21 +6,18 @@ import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.reposito
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 
 @CommandHandler(CreateVehicleCommand)
 export class CreateVehicleHandler implements ICommandHandler<CreateVehicleCommand> {
   constructor(
     @Inject('VehicleRepository')
     private readonly vehicleRepository: VehicleRepository,
+    @Inject('ITraccarProvider')
+    private readonly traccarProvider: ITraccarProvider,
     private readonly auditService: AuditService,
   ) {}
 
-  /**
-   * Ejecuta el registro de un nuevo vehículo.
-   * 
-   * @param command - Datos del vehículo (placa, marca, modelo, año, tenantId, color)
-   * @returns Result con la entidad creada o error si la placa ya existe
-   */
   async execute(command: CreateVehicleCommand): Promise<Result<VehicleEntity, AppError>> {
     // 1. Validar si la placa ya existe
     const existingResult = await this.vehicleRepository.findByPlate(command.plate);
@@ -28,13 +25,39 @@ export class CreateVehicleHandler implements ICommandHandler<CreateVehicleComman
       return err('ALREADY_EXISTS');
     }
 
-    // 2. Crear nueva entidad
+    let traccarId: number | null = null;
+
+    // 2. Registrar el dispositivo en Traccar si se proporcionó un identificador (IMEI / ID App)
+    if (command.uniqueId) {
+      // 2.1. Verificar que el identificador no exista ya en Traccar
+      const existsResult = await this.traccarProvider.checkDeviceExists(command.uniqueId);
+      if (existsResult.isErr()) {
+        return err('TRACCAR_API_ERROR');
+      }
+      if (existsResult.value === true) {
+        return err('TRACCAR_DEVICE_ALREADY_EXISTS');
+      }
+
+      // 2.2. Crear el dispositivo en Traccar
+      const traccarResult = await this.traccarProvider.createDevice({
+        name: command.plate,
+        uniqueId: command.uniqueId,
+      });
+
+      if (traccarResult.isErr()) {
+        return err('TRACCAR_API_ERROR');
+      }
+
+      traccarId = traccarResult.value.id ?? null;
+    }
+
+    // 3. Crear nueva entidad
     const newVehicle = new VehicleEntity();
     newVehicle.plate = command.plate;
-    newVehicle.traccarDeviceId = command.traccarDeviceId ?? null;
+    newVehicle.traccarDeviceId = command.uniqueId ?? null;
+    newVehicle.traccarId = traccarId;
     newVehicle.year = command.year;
     newVehicle.tenantId = command.tenantId;
-
     newVehicle.passengerCapacity = command.passengerCapacity ?? null;
     newVehicle.ownerName = command.ownerName ?? null;
     newVehicle.ownerPhone = command.ownerPhone ?? null;
@@ -42,20 +65,17 @@ export class CreateVehicleHandler implements ICommandHandler<CreateVehicleComman
       newVehicle.status = command.status as any;
     }
 
-
-    // 3. Guardar en persistencia
+    // 4. Guardar en persistencia
     const saveResult = await this.vehicleRepository.save(newVehicle);
 
     if (saveResult.isOk()) {
-      // 4. Registrar en auditoría
-      const vehicle = saveResult.value;
       this.auditService.createLog({
         tenantId: command.tenantId,
         userId: command.userId,
         action: 'CREATE',
         entityName: 'vehicles',
-        entityId: vehicle.id,
-        newValues: vehicle,
+        entityId: saveResult.value.id,
+        newValues: saveResult.value,
         ipAddress: command.ipAddress,
         userAgent: command.userAgent,
       });

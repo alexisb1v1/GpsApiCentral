@@ -24,7 +24,7 @@ export class CreateVehicleController {
     const result = await this.commandBus.execute(
       new CreateVehicleCommand(
         dto.plate,
-        dto.traccarDeviceId || null,
+        dto.uniqueId || null,
         dto.year,
         dto.tenantId,
         req.user.sub,

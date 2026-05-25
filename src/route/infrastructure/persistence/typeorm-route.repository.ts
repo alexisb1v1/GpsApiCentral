@@ -30,7 +30,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
     try {
       const route = await this.routeRepository.findOne({
         where: { id },
-        relations: ['stops', 'stops.geofence'],
+        relations: ['stops'],
       });
       if (!route) return err('NOT_FOUND');
       return ok(route);
@@ -44,6 +44,7 @@ export class TypeOrmRouteRepository implements RouteRepository {
     try {
       const routes = await this.routeRepository.find({
         where: { tenantId },
+        relations: ['stops'],
         order: { name: 'ASC' },
       });
       return ok(routes);
@@ -73,9 +74,13 @@ export class TypeOrmRouteRepository implements RouteRepository {
     }
   }
 
-  async deleteStopsByRoute(routeId: string): Promise<Result<void, AppError>> {
+  async deleteStopsByRoute(routeId: string, direction?: 'IDA' | 'VUELTA'): Promise<Result<void, AppError>> {
     try {
-      await this.stopRepository.delete({ routeId });
+      const criteria: any = { routeId };
+      if (direction) {
+        criteria.direction = direction;
+      }
+      await this.stopRepository.delete(criteria);
       return ok(undefined);
     } catch (error) {
       console.error('Error in deleteStopsByRoute:', error);

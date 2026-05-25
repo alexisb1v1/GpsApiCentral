@@ -43,7 +43,7 @@ export class TypeOrmVehicleRepository implements VehicleRepository {
     }
   }
 
-  async findByTraccarId(traccarDeviceId: number): Promise<Result<VehicleEntity, AppError>> {
+  async findByTraccarId(traccarDeviceId: string): Promise<Result<VehicleEntity, AppError>> {
     try {
       const vehicle = await this.repository.findOne({ where: { traccarDeviceId } });
       if (!vehicle) return err('NOT_FOUND');

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Result, ok, err } from 'neverthrow';
 import { DailyTicketEntity } from '../../domain/entities/daily-ticket.entity';
+import { DailyRoundEntity } from '../../domain/entities/daily-round.entity';
 import { DailyTicketRepository } from '../../domain/repositories/daily-ticket.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 
@@ -11,6 +12,8 @@ export class TypeOrmDailyTicketRepository implements DailyTicketRepository {
   constructor(
     @InjectRepository(DailyTicketEntity)
     private readonly repository: Repository<DailyTicketEntity>,
+    @InjectRepository(DailyRoundEntity)
+    private readonly roundRepository: Repository<DailyRoundEntity>,
   ) {}
 
   async save(ticket: DailyTicketEntity): Promise<Result<DailyTicketEntity, AppError>> {
@@ -60,6 +63,33 @@ export class TypeOrmDailyTicketRepository implements DailyTicketRepository {
       return ok(ticket);
     } catch (error) {
       console.error('Error finding daily ticket by id:', error);
+      return err('INTERNAL_ERROR');
+    }
+  }
+
+  async saveRound(round: DailyRoundEntity): Promise<Result<DailyRoundEntity, AppError>> {
+    try {
+      const saved = await this.roundRepository.save(round);
+      return ok(saved);
+    } catch (error) {
+      console.error('Error saving daily round:', error);
+      return err('INTERNAL_ERROR');
+    }
+  }
+
+  async findByTenantAndDate(tenantId: string, date: string): Promise<Result<DailyTicketEntity[], AppError>> {
+    try {
+      const tickets = await this.repository.createQueryBuilder('ticket')
+        .leftJoinAndSelect('ticket.vehicle', 'vehicle')
+        .leftJoinAndSelect('ticket.driver', 'driver')
+        .leftJoinAndSelect('ticket.rounds', 'rounds')
+        .where('ticket.tenantId = :tenantId', { tenantId })
+        .andWhere('ticket.workDate = :date', { date })
+        .orderBy('ticket.createdAt', 'DESC')
+        .getMany();
+      return ok(tickets);
+    } catch (error) {
+      console.error('Error finding tickets by tenant and date:', error);
       return err('INTERNAL_ERROR');
     }
   }

@@ -1,6 +1,4 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
-import { GeofenceEntity } from '@geofence/domain/entities/geofence.entity';
 import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 
@@ -20,8 +18,8 @@ export class TrackingEventEntity {
   @Column({ name: 'daily_ticket_id', type: 'uuid' })
   dailyTicketId: string;
 
-  @Column({ name: 'geofence_id', type: 'uuid', nullable: true })
-  geofenceId: string;
+  @Column({ name: 'traccar_geofence_id', type: 'int', nullable: true })
+  traccarGeofenceId: number | null;
 
   @Column({ name: 'round_id', type: 'uuid', nullable: true })
   roundId: string;
@@ -47,10 +45,6 @@ export class TrackingEventEntity {
   @ManyToOne(() => DailyTicketEntity)
   @JoinColumn({ name: 'daily_ticket_id' })
   dailyTicket: DailyTicketEntity;
-
-  @ManyToOne(() => GeofenceEntity)
-  @JoinColumn({ name: 'geofence_id' })
-  geofence: GeofenceEntity;
 
   @ManyToOne(() => DailyRoundEntity)
   @JoinColumn({ name: 'round_id' })

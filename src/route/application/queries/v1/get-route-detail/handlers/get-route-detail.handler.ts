@@ -32,14 +32,14 @@ export class GetRouteDetailHandler implements IQueryHandler<GetRouteDetailQuery>
       
       // Mapear lat/lng a cada parada usando traccarGeofenceId
       for (const stop of route.stops) {
-        if (stop.geofence && stop.geofence.traccarGeofenceId) {
-          const match = traccarGeofences.find(g => g.id === stop.geofence.traccarGeofenceId);
+        if (stop.traccarGeofenceId) {
+          const match = traccarGeofences.find(g => g.id === stop.traccarGeofenceId);
           if (match && match.area) {
             // Parsear CIRCLE (-8.3791 -74.5321, 80) o similar
             const matchCoordinates = match.area.match(/CIRCLE\s*\(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*\)/i);
             if (matchCoordinates) {
-              stop.geofence.lat = parseFloat(matchCoordinates[1]);
-              stop.geofence.lng = parseFloat(matchCoordinates[2]);
+              (stop as any).lat = parseFloat(matchCoordinates[1]);
+              (stop as any).lng = parseFloat(matchCoordinates[2]);
             }
           }
         }

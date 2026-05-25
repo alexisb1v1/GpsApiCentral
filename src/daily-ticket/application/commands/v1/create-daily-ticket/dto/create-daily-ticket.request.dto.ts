@@ -39,4 +39,19 @@ export class CreateDailyTicketRequestDto {
   @IsOptional()
   @IsDateString()
   workDate?: string;
+
+  @ApiProperty({ description: 'Método de pago', example: 'EFECTIVO' })
+  @IsNotEmpty()
+  @IsString()
+  paymentMethod: string;
+
+  @ApiProperty({ description: 'Referencia o número de comprobante de pago', example: 'REF-99201-B', required: false })
+  @IsOptional()
+  @IsString()
+  paymentReference?: string;
+
+  @ApiProperty({ description: 'Dirección del viaje inicial (IDA o VUELTA)', example: 'IDA', required: false })
+  @IsOptional()
+  @IsString()
+  direction?: string;
 }

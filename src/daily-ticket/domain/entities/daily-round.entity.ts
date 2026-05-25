@@ -31,6 +31,9 @@ export class DailyRoundEntity {
   })
   status: RoundsStatus;
 
+  @Column({ name: 'direction', type: 'varchar', default: 'IDA' })
+  direction: string;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

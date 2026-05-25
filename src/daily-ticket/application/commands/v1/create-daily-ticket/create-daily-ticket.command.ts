@@ -9,6 +9,9 @@ export class CreateDailyTicketCommand {
     public readonly adminFee: number,
     public readonly routeFee: number,
     public readonly workDate: string | null, // Formato YYYY-MM-DD
+    public readonly paymentMethod: string,
+    public readonly paymentReference: string | null,
+    public readonly direction: string | null,
     public readonly ipAddress: string,
     public readonly userAgent: string,
   ) {}

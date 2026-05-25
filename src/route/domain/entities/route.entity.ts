@@ -16,8 +16,14 @@ export class RouteEntity {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
-  @Column({ name: 'coordinates', type: 'jsonb', nullable: true })
-  coordinates?: { lat: number; lng: number }[];
+  @Column({ name: 'outbound_coordinates', type: 'jsonb', nullable: true })
+  outboundCoordinates?: { lat: number; lng: number }[];
+
+  @Column({ name: 'inbound_coordinates', type: 'jsonb', nullable: true })
+  inboundCoordinates?: { lat: number; lng: number }[];
+
+  @Column({ name: 'traccar_group_id', type: 'int', nullable: true })
+  traccarGroupId?: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

@@ -5,6 +5,7 @@ import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { VehicleDocumentEntity } from '@vehicle/domain/entities/vehicle-document.entity';
 import { TypeOrmVehicleRepository } from '@vehicle/infrastructure/persistence/typeorm-vehicle.repository';
 import { TypeOrmVehicleDocumentRepository } from '@vehicle/infrastructure/persistence/typeorm-vehicle-document.repository';
+import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
 
 // Commands
 import { CreateVehicleHandler } from '@vehicle/application/commands/v1/create-vehicle/handlers/create-vehicle.handler';
@@ -57,6 +58,7 @@ const Repositories = [
   imports: [
     TypeOrmModule.forFeature([VehicleEntity, VehicleDocumentEntity]),
     CqrsModule,
+    TraccarModule,
   ],
   controllers: [
     CreateVehicleController,

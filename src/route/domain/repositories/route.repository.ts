@@ -11,5 +11,5 @@ export interface RouteRepository {
   
   // Gestión de Paraderos
   saveStops(stops: RouteStopEntity[]): Promise<Result<RouteStopEntity[], AppError>>;
-  deleteStopsByRoute(routeId: string): Promise<Result<void, AppError>>;
+  deleteStopsByRoute(routeId: string, direction?: 'IDA' | 'VUELTA'): Promise<Result<void, AppError>>;
 }

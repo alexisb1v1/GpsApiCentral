@@ -41,6 +41,18 @@ export const ERROR_CODES = {
     message: 'El recurso ya existe',
   },
 
+  // Errores de integración externa
+  TRACCAR_API_ERROR: {
+    statusCode: 500,
+    errorCode: 'TRAC_001',
+    message: 'Error al comunicarse con el servidor de Traccar',
+  },
+  TRACCAR_DEVICE_ALREADY_EXISTS: {
+    statusCode: 409,
+    errorCode: 'TRAC_002',
+    message: 'El identificador (IMEI / ID App) ya está registrado en el servidor de Traccar',
+  },
+
   // Errores internos
   INTERNAL_ERROR: {
     statusCode: 500,

@@ -8,6 +8,21 @@ export interface TraccarGeofence {
   attributes?: Record<string, any>;
 }
 
+export interface TraccarGroup {
+  id?: number;
+  name: string;
+  parentId?: number;
+  attributes?: Record<string, any>;
+}
+
+export interface TraccarDevice {
+  id?: number;
+  name: string;
+  uniqueId: string; // IMEI o identificador único del dispositivo GPS / App
+  groupId?: number;
+  attributes?: Record<string, any>;
+}
+
 export interface ITraccarProvider {
   /**
    * Crea una geocerca en el servidor de Traccar.
@@ -25,7 +40,31 @@ export interface ITraccarProvider {
   deleteGeofence(id: number): Promise<Result<void, Error>>;
 
   /**
-   * Obtiene todas las geocercas registradas en Traccar.
+   * Obtiene todas las geocercas registradas en Traccar, opcionalmente filtradas por grupo.
    */
-  getGeofences(): Promise<Result<TraccarGeofence[], Error>>;
+  getGeofences(groupId?: number): Promise<Result<TraccarGeofence[], Error>>;
+
+  /**
+   * Crea un grupo en el servidor de Traccar.
+   */
+  createGroup(group: TraccarGroup): Promise<Result<TraccarGroup, Error>>;
+
+  /**
+   * Vincula una geocerca con un grupo de Traccar (tabla de permisos).
+   */
+  linkGeofenceToGroup(groupId: number, geofenceId: number): Promise<Result<void, Error>>;
+
+  /**
+   * Crea un dispositivo (vehículo GPS) en el servidor de Traccar.
+   * @param device - Datos del dispositivo: nombre y uniqueId (IMEI o ID de App)
+   */
+  createDevice(device: TraccarDevice): Promise<Result<TraccarDevice, Error>>;
+
+  /**
+   * Verifica si un dispositivo con el uniqueId dado ya existe en Traccar.
+   * @param uniqueId - IMEI o ID único del dispositivo
+   * @returns true si ya está registrado, false si está libre
+   */
+  checkDeviceExists(uniqueId: string): Promise<Result<boolean, Error>>;
 }
+

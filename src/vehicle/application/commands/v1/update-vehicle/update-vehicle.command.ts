@@ -2,7 +2,7 @@ export class UpdateVehicleCommand {
   constructor(
     public readonly id: string,
     public readonly plate: string,
-    public readonly traccarDeviceId: number | null,
+    public readonly traccarDeviceId: string | null,
 
     public readonly year: number,
     public readonly tenantId: string,

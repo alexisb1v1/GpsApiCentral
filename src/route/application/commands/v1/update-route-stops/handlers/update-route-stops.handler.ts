@@ -7,16 +7,18 @@ import { RouteStopEntity } from '@route/domain/entities/route-stop.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
-import { GeofenceRepository } from '@geofence/domain/repositories/geofence.repository';
-import { GeofenceEntity, GeofenceType } from '@geofence/domain/entities/geofence.entity';
+
+export enum GeofenceType {
+  START = 'START',
+  CHECKPOINT = 'CHECKPOINT',
+  END = 'END',
+}
 
 @CommandHandler(UpdateRouteStopsCommand)
 export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStopsCommand> {
   constructor(
     @Inject('RouteRepository')
     private readonly routeRepository: RouteRepository,
-    @Inject('GeofenceRepository')
-    private readonly geofenceRepository: GeofenceRepository,
     @Inject('ITraccarProvider')
     private readonly traccarProvider: ITraccarProvider,
     private readonly auditService: AuditService,
@@ -43,7 +45,26 @@ export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStops
       routeUpdated = true;
     }
     if (command.coordinates !== undefined) {
-      route.coordinates = command.coordinates;
+      if (command.direction === 'IDA') {
+        route.outboundCoordinates = command.coordinates;
+      } else {
+        route.inboundCoordinates = command.coordinates;
+      }
+      routeUpdated = true;
+    }
+
+    // Si traccarGroupId es nulo, undefined o 0, creamos el grupo en Traccar
+    if (!route.traccarGroupId || route.traccarGroupId === 0) {
+      const traccarResult = await this.traccarProvider.createGroup({
+        name: route.name,
+      });
+
+      if (traccarResult.isErr()) {
+        return err('TRACCAR_API_ERROR');
+      }
+
+      const traccarGroup = traccarResult.value;
+      route.traccarGroupId = traccarGroup.id;
       routeUpdated = true;
     }
 
@@ -52,59 +73,53 @@ export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStops
       if (saveRouteResult.isErr()) return err(saveRouteResult.error);
     }
 
-    // 2. Eliminar paraderos actuales
-    await this.routeRepository.deleteStopsByRoute(command.routeId);
+    // 2. Eliminar paraderos actuales de la dirección correspondiente
+    await this.routeRepository.deleteStopsByRoute(command.routeId, command.direction);
 
-    // 3. Crear o actualizar paraderos y geocercas en Traccar y base de datos
+    // 2.5. Obtener geocercas vinculadas al grupo de la ruta actualmente en Traccar para evitar re-vincularlas
+    let existingGroupGeofenceIds: number[] = [];
+    if (route.traccarGroupId && route.traccarGroupId !== 0) {
+      const existingGeofencesResult = await this.traccarProvider.getGeofences(route.traccarGroupId);
+      if (existingGeofencesResult.isOk()) {
+        existingGroupGeofenceIds = existingGeofencesResult.value
+          .map(g => g.id!)
+          .filter(id => id !== undefined);
+      }
+    }
+
+    // 3. Crear o actualizar paraderos en Traccar y base de datos
     const newStops: RouteStopEntity[] = [];
 
     for (const dto of command.stops) {
       // 3.1. Determinar el tipo de geocerca basado en el orden
-      let type = GeofenceType.CHECKPOINT;
+      let type: 'START' | 'CHECKPOINT' | 'END' = 'CHECKPOINT';
       if (dto.stopOrder === 1) {
-        type = GeofenceType.START;
+        type = 'START';
       } else if (dto.stopOrder === command.stops.length) {
-        type = GeofenceType.END;
+        type = 'END';
       }
 
       const area = `CIRCLE (${dto.lat} ${dto.lng}, 80)`;
-      let savedGeofence: GeofenceEntity;
+      let finalTraccarGeofenceId: number;
 
-      if (dto.geofenceId) {
+      if (dto.traccarGeofenceId) {
         // --- MODO EDICIÓN ---
-        // 3.2.1. Buscar la geocerca local existente
-        const geofenceResult = await this.geofenceRepository.findById(dto.geofenceId);
-        if (geofenceResult.isErr()) {
-          return err(geofenceResult.error);
-        }
-
-        const geofence = geofenceResult.value;
-
-        // 3.2.2. Actualizar la geocerca en Traccar
-        const traccarResult = await this.traccarProvider.updateGeofence(geofence.traccarGeofenceId, {
-          id: geofence.traccarGeofenceId,
+        // 3.2.1. Actualizar la geocerca en Traccar
+        const traccarResult = await this.traccarProvider.updateGeofence(dto.traccarGeofenceId, {
+          id: dto.traccarGeofenceId,
           name: dto.name,
           description: `Punto de control (Actualizado) - ${routeResult.value.name}`,
           area,
           attributes: {
-            color: type === GeofenceType.START ? '#28a745' : type === GeofenceType.END ? '#dc3545' : '#3b82f6',
+            color: type === 'START' ? '#28a745' : type === 'END' ? '#dc3545' : '#3b82f6',
           },
         });
 
         if (traccarResult.isErr()) {
-          return err('INTERNAL_ERROR');
+          return err('TRACCAR_API_ERROR');
         }
 
-        // 3.2.3. Actualizar la geocerca en nuestra base de datos local
-        geofence.name = dto.name;
-        geofence.type = type;
-
-        const saveGeofenceResult = await this.geofenceRepository.save(geofence);
-        if (saveGeofenceResult.isErr()) {
-          return err(saveGeofenceResult.error);
-        }
-
-        savedGeofence = saveGeofenceResult.value;
+        finalTraccarGeofenceId = dto.traccarGeofenceId;
       } else {
         // --- MODO CREACIÓN ---
         // 3.3.1. Crear geocerca en el API externa de Traccar
@@ -113,42 +128,43 @@ export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStops
           description: `Punto de control - ${routeResult.value.name}`,
           area,
           attributes: {
-            color: type === GeofenceType.START ? '#28a745' : type === GeofenceType.END ? '#dc3545' : '#3b82f6',
+            color: type === 'START' ? '#28a745' : type === 'END' ? '#dc3545' : '#3b82f6',
           },
         });
 
         if (traccarResult.isErr()) {
-          return err('INTERNAL_ERROR');
+          return err('TRACCAR_API_ERROR');
         }
 
         const traccarGeofence = traccarResult.value;
-
-        // 3.3.2. Crear y guardar la geocerca localmente
-        const geofence = new GeofenceEntity();
-        geofence.tenantId = command.tenantId;
-        geofence.traccarGeofenceId = traccarGeofence.id!;
-        geofence.name = dto.name;
-        geofence.type = type;
-
-        const saveGeofenceResult = await this.geofenceRepository.save(geofence);
-        if (saveGeofenceResult.isErr()) {
-          return err(saveGeofenceResult.error);
-        }
-
-        savedGeofence = saveGeofenceResult.value;
+        finalTraccarGeofenceId = traccarGeofence.id!;
       }
 
-      // 3.4. Crear la relación en route_stops
+      // 3.3.2. Sincronizar permisos (vincular geocerca con el grupo en Traccar si no está asociada)
+      if (route.traccarGroupId && route.traccarGroupId !== 0) {
+        const isAlreadyLinked = existingGroupGeofenceIds.includes(finalTraccarGeofenceId);
+        if (!isAlreadyLinked) {
+          const linkResult = await this.traccarProvider.linkGeofenceToGroup(route.traccarGroupId, finalTraccarGeofenceId);
+          if (linkResult.isErr()) {
+            return err('TRACCAR_API_ERROR');
+          }
+        }
+      }
+
+      // 3.4. Crear la parada en route_stops
       const stop = new RouteStopEntity();
       stop.routeId = command.routeId;
-      stop.geofenceId = savedGeofence.id;
+      stop.traccarGeofenceId = finalTraccarGeofenceId;
+      stop.type = type;
+      stop.name = dto.name;
       stop.stopOrder = dto.stopOrder;
       stop.minutesFromStart = dto.minutesFromStart;
+      stop.direction = command.direction;
       stop.coordinates = dto.polygonCoordinates; // Persistencia de la geometría del paradero
       newStops.push(stop);
     }
 
-    // 4. Guardar todas las relaciones de paraderos en la base de datos
+    // 4. Guardar todas las paradas en la base de datos
     const saveStopsResult = await this.routeRepository.saveStops(newStops);
     if (saveStopsResult.isErr()) return err(saveStopsResult.error);
 

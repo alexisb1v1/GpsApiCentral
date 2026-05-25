@@ -8,10 +8,11 @@ export class CreateVehicleRequestDto {
   @MaxLength(20)
   plate: string;
 
-  @ApiProperty({ example: 12345, description: 'ID de Traccar (Device ID)', required: false })
-  @IsInt()
+  @ApiProperty({ example: '864455001122334', description: 'Identificador único del dispositivo GPS (IMEI o ID de App)', required: false })
+  @IsString()
   @IsOptional()
-  traccarDeviceId?: number;
+  @MaxLength(50)
+  uniqueId?: string;
 
 
 

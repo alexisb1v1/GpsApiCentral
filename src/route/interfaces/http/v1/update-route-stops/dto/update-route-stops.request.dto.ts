@@ -3,10 +3,10 @@ import { IsNotEmpty, IsInt, IsString, IsNumber, IsArray, ValidateNested, IsOptio
 import { Type } from 'class-transformer';
  
 export class RouteStopItemDto {
-  @ApiPropertyOptional({ example: 'uuid-geofence', description: 'ID de la geocerca local si ya existe' })
+  @ApiPropertyOptional({ example: 12, description: 'ID de la geocerca en Traccar si ya existe' })
   @IsOptional()
-  @IsUUID()
-  geofenceId?: string;
+  @IsInt()
+  traccarGeofenceId?: number;
 
   @ApiProperty({ example: 'Terminal A', description: 'Nombre del paradero' })
   @IsNotEmpty()
@@ -55,6 +55,11 @@ export class UpdateRouteStopsRequestDto {
   @ValidateNested({ each: true })
   @Type(() => RouteStopItemDto)
   stops: RouteStopItemDto[];
+
+  @ApiProperty({ example: 'IDA', description: 'Dirección de los paraderos y trayecto (IDA o VUELTA)' })
+  @IsNotEmpty()
+  @IsString()
+  direction: 'IDA' | 'VUELTA';
 
   @ApiPropertyOptional({ example: [{ lat: -12.0463, lng: -77.0427 }], description: 'Vértices del recorrido de la ruta' })
   @IsOptional()

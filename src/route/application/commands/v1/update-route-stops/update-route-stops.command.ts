@@ -8,6 +8,7 @@ export class UpdateRouteStopsCommand {
     public readonly userId: string,
     public readonly ipAddress: string,
     public readonly userAgent: string,
+    public readonly direction: 'IDA' | 'VUELTA',
     public readonly name?: string,
     public readonly isActive?: boolean,
     public readonly coordinates?: { lat: number; lng: number }[],

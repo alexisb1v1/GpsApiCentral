@@ -70,6 +70,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
         id: user.id,
         email: user.email,
         name: user.name,
+        tenantId: user.tenantId,
       },
       token: token,
     });

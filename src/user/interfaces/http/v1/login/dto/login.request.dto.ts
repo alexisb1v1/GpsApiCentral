@@ -27,6 +27,9 @@ export class UserResponseDto {
 
   @ApiProperty()
   name: string;
+
+  @ApiProperty()
+  tenantId: string;
 }
 
 export class LoginResponseDto {

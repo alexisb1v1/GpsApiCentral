@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ok, err, Result } from 'neverthrow';
-import { ITraccarProvider, TraccarGeofence } from './traccar-provider.interface';
+import { ITraccarProvider, TraccarGeofence, TraccarGroup, TraccarDevice } from './traccar-provider.interface';
 
 @Injectable()
 export class TraccarProvider implements ITraccarProvider {
@@ -102,9 +102,11 @@ export class TraccarProvider implements ITraccarProvider {
     }
   }
 
-  async getGeofences(): Promise<Result<TraccarGeofence[], Error>> {
-    const url = `${this.baseUrl}/api/geofences`;
-    this.logger.log(`Obteniendo todas las geocercas de Traccar...`);
+  async getGeofences(groupId?: number): Promise<Result<TraccarGeofence[], Error>> {
+    const url = groupId 
+      ? `${this.baseUrl}/api/geofences?groupId=${groupId}` 
+      : `${this.baseUrl}/api/geofences`;
+    this.logger.log(`Obteniendo geocercas de Traccar... (groupId: ${groupId ?? 'todas'})`);
 
     try {
       const response = await fetch(url, {
@@ -124,6 +126,113 @@ export class TraccarProvider implements ITraccarProvider {
 
     } catch (error: any) {
       this.logger.error(`Excepción crítica al obtener geocercas en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
+  async createGroup(group: TraccarGroup): Promise<Result<TraccarGroup, Error>> {
+    const url = `${this.baseUrl}/api/groups`;
+    this.logger.log(`Creando grupo en Traccar: "${group.name}"`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(group),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al crear grupo: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      const data = (await response.json()) as TraccarGroup;
+      this.logger.log(`Grupo creado con éxito en Traccar. ID asignado: ${data.id}`);
+      return ok(data);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al crear grupo en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
+  async linkGeofenceToGroup(groupId: number, geofenceId: number): Promise<Result<void, Error>> {
+    const url = `${this.baseUrl}/api/permissions`;
+    this.logger.log(`Vinculando geocerca ${geofenceId} con grupo ${groupId} en Traccar...`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ groupId, geofenceId }),
+      });
+
+      if (!response.ok && response.status !== 204) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al vincular geocerca ${geofenceId} con grupo ${groupId}: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      this.logger.log(`Geocerca ${geofenceId} vinculada con éxito al grupo ${groupId} en Traccar`);
+      return ok(undefined);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al vincular geocerca al grupo en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
+  async createDevice(device: TraccarDevice): Promise<Result<TraccarDevice, Error>> {
+    const url = `${this.baseUrl}/api/devices`;
+    this.logger.log(`Creando dispositivo en Traccar: "${device.name}" (uniqueId: ${device.uniqueId})`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(device),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al crear dispositivo: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      const data = (await response.json()) as TraccarDevice;
+      this.logger.log(`Dispositivo creado con éxito en Traccar. ID asignado: ${data.id}`);
+      return ok(data);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al crear dispositivo en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
+  async checkDeviceExists(uniqueId: string): Promise<Result<boolean, Error>> {
+    const url = `${this.baseUrl}/api/devices?uniqueId=${encodeURIComponent(uniqueId)}`;
+    this.logger.log(`Verificando si el identificador "${uniqueId}" ya existe en Traccar...`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al verificar dispositivo: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      const devices = (await response.json()) as TraccarDevice[];
+      const exists = devices.length > 0;
+      this.logger.log(`Identificador "${uniqueId}" ${exists ? 'YA EXISTE' : 'está disponible'} en Traccar`);
+      return ok(exists);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al verificar dispositivo en Traccar: ${error.message}`);
       return err(new Error(`Excepción en conector Traccar: ${error.message}`));
     }
   }

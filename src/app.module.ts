@@ -12,11 +12,11 @@ import { DriverModule } from './driver/infrastructure/nestjs/driver.module';
 import { JwtAuthGuard } from '@shared/infrastructure/guards/jwt-auth.guard';
 import { InfractionModule } from './infraction/infrastructure/nestjs/infraction.module';
 import { DailyTicketModule } from './daily-ticket/infrastructure/nestjs/daily-ticket.module';
-import { GeofenceModule } from './geofence/infrastructure/nestjs/geofence.module';
 import { RouteModule } from './route/infrastructure/nestjs/route.module';
 import { TrackingModule } from './tracking/infrastructure/nestjs/tracking.module';
 import { StorageModule } from '@shared/infrastructure/storage/storage.module';
 import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -32,11 +32,11 @@ import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
     DriverModule,
     InfractionModule,
     DailyTicketModule,
-    GeofenceModule,
     RouteModule,
     TrackingModule,
     StorageModule,
     TraccarModule,
+    MonitoringModule,
     // Aquí se importarán los módulos de dominio (ej. GpsModule)
   ],
   controllers: [HealthCheckController],

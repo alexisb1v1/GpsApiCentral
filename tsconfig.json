@@ -21,7 +21,8 @@
       "@route/*": ["src/route/*"],
       "@tracking/*": ["src/tracking/*"],
       "@geofence/*": ["src/geofence/*"],
-      "@driver/*": ["src/driver/*"]
+      "@driver/*": ["src/driver/*"],
+      "@monitoring/*": ["src/monitoring/*"]
     },
     "incremental": true,
     "skipLibCheck": true,
