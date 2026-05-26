@@ -101,6 +101,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     trackingEvent.latitude = position.latitude;
     trackingEvent.longitude = position.longitude;
     trackingEvent.durationSeconds = durationSeconds;
+    trackingEvent.rawPayload = payload;
     await this.trackingEventRepository.save(trackingEvent);
 
     // 5. Regla de Negocio: Solo procesamos ENTRADAS para penalidades

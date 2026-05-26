@@ -42,6 +42,9 @@ export class TrackingEventEntity {
   @Column({ name: 'duration_seconds', type: 'int', nullable: true })
   durationSeconds: number | null;
 
+  @Column({ name: 'raw_payload', type: 'jsonb', nullable: true })
+  rawPayload: any | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
