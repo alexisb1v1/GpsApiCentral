@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { Subject } from 'rxjs';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
 
@@ -11,12 +12,18 @@ export interface CachedVehicleState {
   dailyTicketId: string | null; // UUID del ticket si pagó hoy, o null si no
   plate: string;
   driverName: string | null;
+  driverId: string | null; // ID del conductor
+  routeId: string | null; // ID de la ruta asignada
+  direction: 'IDA' | 'VUELTA' | null; // Dirección activa de la ruta
   lastPosition?: any; // Última posición conocida reportada por Traccar
 }
 
 @Injectable()
 export class VehicleTenantCache implements OnModuleInit {
   private readonly logger = new Logger(VehicleTenantCache.name);
+  
+  // Stream de actualizaciones en caliente para componentes reactivos (como WebSockets)
+  public readonly cacheUpdates$ = new Subject<{ vehicleId: string; state: CachedVehicleState }>();
   
   // Mapa en memoria: traccarDeviceId (número) -> CachedVehicleState
   private readonly cache = new Map<number, CachedVehicleState>();
@@ -68,15 +75,29 @@ export class VehicleTenantCache implements OnModuleInit {
             status: TicketStatus.ACTIVE,
             workDate: todayStr as any,
           },
-          relations: ['driver'],
+          relations: ['driver', 'rounds'],
         });
 
         // Mapear los tickets activos por vehicleId para búsqueda rápida en memoria
-        const activeTicketsByVehicle = new Map<string, { ticketId: string; driverName: string }>(); 
+        const activeTicketsByVehicle = new Map<string, { 
+          ticketId: string; 
+          driverName: string; 
+          driverId: string | null;
+          routeId: string | null;
+          direction: 'IDA' | 'VUELTA' | null;
+        }>(); 
         for (const ticket of activeTickets) {
+          let direction: 'IDA' | 'VUELTA' | null = 'IDA';
+          if (ticket.rounds && ticket.rounds.length > 0) {
+            const activeRound = ticket.rounds.find(r => r.status === 'IN_PROGRESS') || ticket.rounds[ticket.rounds.length - 1];
+            direction = activeRound ? (activeRound.direction as any) : 'IDA';
+          }
           activeTicketsByVehicle.set(ticket.vehicleId, {
             ticketId: ticket.id,
             driverName: ticket.driver ? ticket.driver.name : 'No asignado',
+            driverId: ticket.driverId || null,
+            routeId: ticket.routeId || null,
+            direction: direction,
           });
         }
 
@@ -144,6 +165,9 @@ export class VehicleTenantCache implements OnModuleInit {
             dailyTicketId: ticketData ? ticketData.ticketId : null,
             plate: vehicle.plate,
             driverName: ticketData ? ticketData.driverName : 'No asignado',
+            driverId: ticketData ? ticketData.driverId : null,
+            routeId: ticketData ? ticketData.routeId : null,
+            direction: ticketData ? ticketData.direction : null,
           };
 
           this.cache.set(traccarIdNum, state);
@@ -194,6 +218,9 @@ export class VehicleTenantCache implements OnModuleInit {
           vehicleId: state.vehicleId,
           plate: state.plate,
           driverName: state.driverName,
+          driverId: state.driverId,
+          routeId: state.routeId,
+          direction: state.direction,
           dailyTicketId: state.dailyTicketId,
           hasActiveTicket: !!state.dailyTicketId,
         });
@@ -201,6 +228,29 @@ export class VehicleTenantCache implements OnModuleInit {
     }
     return positions;
   }
+
+  /**
+   * Obtiene la última posición conocida enriquecida del vehículo asignado a un conductor específico
+   */
+  getLatestPositionByDriver(driverId: string): any | null {
+    for (const [_, state] of this.cache.entries()) {
+      if (state.driverId === driverId && state.lastPosition) {
+        return {
+          ...state.lastPosition,
+          vehicleId: state.vehicleId,
+          plate: state.plate,
+          driverName: state.driverName,
+          driverId: state.driverId,
+          routeId: state.routeId,
+          direction: state.direction,
+          dailyTicketId: state.dailyTicketId,
+          hasActiveTicket: !!state.dailyTicketId,
+        };
+      }
+    }
+    return null;
+  }
+
 
   /**
    * Registra o actualiza en caliente el ticket diario de un vehículo en la caché
@@ -217,23 +267,41 @@ export class VehicleTenantCache implements OnModuleInit {
       currentState.dailyTicketId = dailyTicketId;
       
       let driverName = 'No asignado';
+      let driverId: string | null = null;
+      let routeId: string | null = null;
+      let direction: 'IDA' | 'VUELTA' | null = null;
       if (dailyTicketId) {
         try {
           const ticket = await this.ticketRepository.findOne({
             where: { id: dailyTicketId },
-            relations: ['driver'],
+            relations: ['driver', 'rounds'],
           });
-          if (ticket && ticket.driver) {
-            driverName = ticket.driver.name;
+          if (ticket) {
+            driverName = ticket.driver ? ticket.driver.name : 'No asignado';
+            driverId = ticket.driverId || null;
+            routeId = ticket.routeId || null;
+            
+            if (ticket.rounds && ticket.rounds.length > 0) {
+              const activeRound = ticket.rounds.find(r => r.status === 'IN_PROGRESS') || ticket.rounds[ticket.rounds.length - 1];
+              direction = activeRound ? (activeRound.direction as any) : 'IDA';
+            } else {
+              direction = 'IDA';
+            }
           }
         } catch (error: any) {
-          this.logger.error(`Error al obtener chofer para ticket en caliente: ${error.message}`);
+          this.logger.error(`Error al obtener chofer y ruta para ticket en caliente: ${error.message}`);
         }
       }
       
       currentState.driverName = driverName;
+      currentState.driverId = driverId;
+      currentState.routeId = routeId;
+      currentState.direction = direction;
       this.cache.set(traccarId, currentState);
-      this.logger.log(`Caché actualizada en caliente: Vehículo ID ${vehicleId} -> Ticket ID ${dailyTicketId}, Chofer: ${driverName}`);
+      this.logger.log(`Caché actualizada en caliente: Vehículo ID ${vehicleId} -> Ticket ID ${dailyTicketId}, Chofer: ${driverName} (ID: ${driverId}), Ruta: ${routeId}, Dirección: ${direction}`);
+      
+      // Notificar reactivamente a los suscriptores (WebSockets)
+      this.cacheUpdates$.next({ vehicleId, state: currentState });
     }
   }
 

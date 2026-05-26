@@ -71,6 +71,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
         email: user.email,
         name: user.name,
         tenantId: user.tenantId,
+        role: user.role,
       },
       token: token,
     });

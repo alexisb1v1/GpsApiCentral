@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Subscription } from 'rxjs';
 import { TraccarSocketService } from '../../infrastructure/traccar/traccar-socket.service';
 import { VehicleTenantCache } from '../../infrastructure/cache/vehicle-tenant.cache';
+import { DriverGateway } from './driver.gateway';
 
 @WebSocketGateway({
   cors: {
@@ -14,6 +15,7 @@ import { VehicleTenantCache } from '../../infrastructure/cache/vehicle-tenant.ca
 export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MonitoringGateway.name);
   private traccarSubscription: Subscription | null = null;
+  private cacheSubscription: Subscription | null = null;
 
   @WebSocketServer()
   server: Server;
@@ -22,6 +24,7 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
     private readonly jwtService: JwtService,
     private readonly traccarSocketService: TraccarSocketService,
     private readonly vehicleTenantCache: VehicleTenantCache,
+    private readonly driverGateway: DriverGateway,
   ) {}
 
   afterInit(server: Server) {
@@ -30,11 +33,15 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
 
   onModuleInit() {
     this.subscribeToTraccarPositions();
+    this.subscribeToCacheUpdates();
   }
 
   onModuleDestroy() {
     if (this.traccarSubscription) {
       this.traccarSubscription.unsubscribe();
+    }
+    if (this.cacheSubscription) {
+      this.cacheSubscription.unsubscribe();
     }
   }
 
@@ -121,9 +128,17 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
               vehicleId: state.vehicleId,
               plate: state.plate,
               driverName: state.driverName,
+              driverId: state.driverId, // ID único del conductor
+              routeId: state.routeId, // ID de la ruta
+              direction: state.direction, // Dirección (IDA/VUELTA)
               dailyTicketId: state.dailyTicketId, // UUID o null (unidades sin pagar/"piratas")
               hasActiveTicket: !!state.dailyTicketId,
             };
+
+            // Si el vehículo tiene un conductor asignado, retransmitir al canal virtual de choferes en tiempo real
+            if (state.driverId) {
+              this.driverGateway.emitPositionToDriver(state.driverId, enrichedPosition);
+            }
 
             const tenantGroup = positionsByTenant.get(state.tenantId) || [];
             tenantGroup.push(enrichedPosition);
@@ -145,6 +160,40 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
       error: (err) => {
         this.logger.error(`Error crítico en el stream de posiciones satelitales: ${err.message}`);
       },
+    });
+  }
+
+  /**
+   * Se suscribe a las actualizaciones en caliente de la caché (DailyTickets) y notifica a las salas correspondientes
+   */
+  private subscribeToCacheUpdates() {
+    this.cacheSubscription = this.vehicleTenantCache.cacheUpdates$.subscribe({
+      next: ({ vehicleId, state }) => {
+        try {
+          if (state.lastPosition) {
+            const enrichedPosition = {
+              ...state.lastPosition,
+              vehicleId: state.vehicleId,
+              plate: state.plate,
+              driverName: state.driverName,
+              driverId: state.driverId,
+              routeId: state.routeId,
+              direction: state.direction,
+              dailyTicketId: state.dailyTicketId,
+              hasActiveTicket: !!state.dailyTicketId,
+            };
+            
+            // Emitir en ráfaga (arreglo de un elemento) para mantener compatibilidad
+            this.server.to(`tenant:${state.tenantId}`).emit('positions', [enrichedPosition]);
+            this.logger.log(`[Socket.io Cache Sync] Sincronización en caliente para vehículo ${vehicleId} emitida a sala "tenant:${state.tenantId}"`);
+          }
+        } catch (error: any) {
+          this.logger.error(`Error al procesar la actualización en caliente de caché en WebSocket: ${error.message}`);
+        }
+      },
+      error: (err) => {
+        this.logger.error(`Error en la suscripción de actualizaciones de caché: ${err.message}`);
+      }
     });
   }
 }

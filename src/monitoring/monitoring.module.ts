@@ -7,6 +7,7 @@ import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.en
 import { VehicleTenantCache } from './infrastructure/cache/vehicle-tenant.cache';
 import { TraccarSocketService } from './infrastructure/traccar/traccar-socket.service';
 import { MonitoringGateway } from './interfaces/ws/monitoring.gateway';
+import { DriverGateway } from './interfaces/ws/driver.gateway';
 import { DailyTicketModule } from '@daily-ticket/infrastructure/nestjs/daily-ticket.module';
 
 @Module({
@@ -26,6 +27,7 @@ import { DailyTicketModule } from '@daily-ticket/infrastructure/nestjs/daily-tic
     VehicleTenantCache,
     TraccarSocketService,
     MonitoringGateway,
+    DriverGateway,
   ],
   exports: [
     VehicleTenantCache,
