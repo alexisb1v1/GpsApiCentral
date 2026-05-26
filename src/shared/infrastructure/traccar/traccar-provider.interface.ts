@@ -66,5 +66,14 @@ export interface ITraccarProvider {
    * @returns true si ya está registrado, false si está libre
    */
   checkDeviceExists(uniqueId: string): Promise<Result<boolean, Error>>;
+
+  /**
+   * Obtiene el historial de posiciones de un dispositivo en un rango de fechas.
+   * @param deviceId - ID numérico del dispositivo en Traccar (traccarId)
+   * @param from - Fecha de inicio (UTC)
+   * @param to - Fecha de fin (UTC)
+   */
+  getDevicePositions(traccarDeviceId: number, from: Date, to: Date): Promise<Result<any[], Error>>;
 }
+
 

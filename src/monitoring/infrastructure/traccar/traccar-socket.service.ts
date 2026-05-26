@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { Subject } from 'rxjs';
 import * as WebSocket from 'ws';
+import { VehicleTenantCache } from '../cache/vehicle-tenant.cache';
 
 @Injectable()
 export class TraccarSocketService implements OnModuleInit, OnModuleDestroy {
@@ -21,7 +22,10 @@ export class TraccarSocketService implements OnModuleInit, OnModuleDestroy {
   // Stream reactivo público para emitir las posiciones satelitales a la aplicación
   public readonly positions$ = new Subject<any[]>();
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly vehicleTenantCache: VehicleTenantCache,
+  ) {
     // Carga de variables de entorno con defaults seguros
     this.traccarUrl = this.configService.get<string>('TRACCAR_URL') || 'http://localhost:8082';
     this.wsUrl = this.configService.get<string>('TRACCAR_WS_URL') || 'ws://localhost:8082/api/socket';
@@ -29,7 +33,14 @@ export class TraccarSocketService implements OnModuleInit, OnModuleDestroy {
     this.traccarPassword = this.configService.get<string>('TRACCAR_PASSWORD') || 'admin';
   }
 
-  onModuleInit() {
+  async onModuleInit() {
+    this.logger.log('[Traccar WS] Esperando hidratación máster de caché en memoria antes de abrir el WebSocket...');
+    try {
+      await this.vehicleTenantCache.preloadCache();
+      this.logger.log('[Traccar WS] Caché en memoria hidratado con éxito. Conectando al WebSocket de Traccar...');
+    } catch (cacheError: any) {
+      this.logger.error(`[Traccar WS] Advertencia al precargar el caché: ${cacheError.message}. Se intentará conectar de todas formas.`);
+    }
     this.connectToTraccar();
   }
 

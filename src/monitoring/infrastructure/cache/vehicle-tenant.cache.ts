@@ -11,6 +11,7 @@ export interface CachedVehicleState {
   dailyTicketId: string | null; // UUID del ticket si pagó hoy, o null si no
   plate: string;
   driverName: string | null;
+  lastPosition?: any; // Última posición conocida reportada por Traccar
 }
 
 @Injectable()
@@ -22,6 +23,9 @@ export class VehicleTenantCache implements OnModuleInit {
   
   // Mapa inverso para actualizaciones rápidas por vehicleId (string) -> traccarDeviceId (number)
   private readonly vehicleIdToTraccarId = new Map<string, number>();
+
+  private preloadPromise: Promise<void> | null = null;
+
 
   constructor(
     @InjectRepository(VehicleEntity)
@@ -39,115 +43,121 @@ export class VehicleTenantCache implements OnModuleInit {
    * Precarga en memoria toda la información de vehículos y sus tickets diarios activos del día.
    */
   async preloadCache(): Promise<void> {
-    try {
-      this.logger.log('Iniciando precarga de caché de vehículos y tickets diarios...');
-      this.cache.clear();
-      this.vehicleIdToTraccarId.clear();
+    if (this.preloadPromise) return this.preloadPromise;
 
-      // 1. Obtener todos los vehículos con traccarDeviceId configurado
-      const vehicles = await this.vehicleRepository.find() as any[];
-      
-      // 2. Obtener los tickets activos del día actual de trabajo en hora de Pucallpa/Lima (America/Lima)
-      const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Lima',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
-      const todayStr = formatter.format(new Date());
-      
-      const activeTickets = await this.ticketRepository.find({
-        where: {
-          status: TicketStatus.ACTIVE,
-          workDate: todayStr as any,
-        },
-        relations: ['driver'],
-      });
+    this.preloadPromise = (async () => {
+      try {
+        this.logger.log('Iniciando precarga de caché de vehículos y tickets diarios...');
+        this.cache.clear();
+        this.vehicleIdToTraccarId.clear();
 
-      // Mapear los tickets activos por vehicleId para búsqueda rápida en memoria
-      const activeTicketsByVehicle = new Map<string, { ticketId: string; driverName: string }>(); 
-      for (const ticket of activeTickets) {
-        activeTicketsByVehicle.set(ticket.vehicleId, {
-          ticketId: ticket.id,
-          driverName: ticket.driver ? ticket.driver.name : 'No asignado',
+        // 1. Obtener todos los vehículos con traccarDeviceId configurado
+        const vehicles = await this.vehicleRepository.find() as any[];
+        
+        // 2. Obtener los tickets activos del día actual de trabajo en hora de Pucallpa/Lima (America/Lima)
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Lima',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
         });
-      }
+        const todayStr = formatter.format(new Date());
+        
+        const activeTickets = await this.ticketRepository.find({
+          where: {
+            status: TicketStatus.ACTIVE,
+            workDate: todayStr as any,
+          },
+          relations: ['driver'],
+        });
 
-      // 3. Autocuración dinámica: Consultar a Traccar solo si se detectan vehículos activos sin traccarId local guardado
-      const needsTraccarApiFetch = vehicles.some(v => v.traccarDeviceId && !v.traccarId);
-      const traccarDeviceMap = new Map<string, number>();
-
-      if (needsTraccarApiFetch) {
-        this.logger.log('Se detectaron vehículos sin traccarId localmente en la base de datos. Consultando API de Traccar para autocuración en memoria...');
-        try {
-          const traccarUrl = this.configService.get<string>('TRACCAR_URL') || 'http://localhost:8082';
-          const traccarAuth = this.configService.get<string>('TRACCAR_AUTHORIZATION') || '';
-          
-          const response = await fetch(`${traccarUrl.replace(/\/$/, '')}/api/devices`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              ...(traccarAuth ? { 'Authorization': traccarAuth } : {}),
-            },
+        // Mapear los tickets activos por vehicleId para búsqueda rápida en memoria
+        const activeTicketsByVehicle = new Map<string, { ticketId: string; driverName: string }>(); 
+        for (const ticket of activeTickets) {
+          activeTicketsByVehicle.set(ticket.vehicleId, {
+            ticketId: ticket.id,
+            driverName: ticket.driver ? ticket.driver.name : 'No asignado',
           });
+        }
 
-          if (response.ok) {
-            const traccarDevices = (await response.json()) as any[];
-            for (const device of traccarDevices) {
-              if (device.uniqueId && device.id) {
-                traccarDeviceMap.set(device.uniqueId, device.id);
+        // 3. Autocuración dinámica: Consultar a Traccar solo si se detectan vehículos activos sin traccarId local guardado
+        const needsTraccarApiFetch = vehicles.some(v => v.traccarDeviceId && !v.traccarId);
+        const traccarDeviceMap = new Map<string, number>();
+
+        if (needsTraccarApiFetch) {
+          this.logger.log('Se detectaron vehículos sin traccarId localmente en la base de datos. Consultando API de Traccar para autocuración en memoria...');
+          try {
+            const traccarUrl = this.configService.get<string>('TRACCAR_URL') || 'http://localhost:8082';
+            const traccarAuth = this.configService.get<string>('TRACCAR_AUTHORIZATION') || '';
+            
+            const response = await fetch(`${traccarUrl.replace(/\/$/, '')}/api/devices`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...(traccarAuth ? { 'Authorization': traccarAuth } : {}),
+              },
+            });
+
+            if (response.ok) {
+              const traccarDevices = (await response.json()) as any[];
+              for (const device of traccarDevices) {
+                if (device.uniqueId && device.id) {
+                  traccarDeviceMap.set(device.uniqueId, device.id);
+                }
               }
+              this.logger.log(`Mapeo de dispositivos Traccar cargado de forma auxiliar. ${traccarDeviceMap.size} dispositivos encontrados.`);
+            } else {
+              this.logger.warn(`No se pudo obtener el mapeo dinámico de Traccar. Código de estado: ${response.status}`);
             }
-            this.logger.log(`Mapeo de dispositivos Traccar cargado de forma auxiliar. ${traccarDeviceMap.size} dispositivos encontrados.`);
-          } else {
-            this.logger.warn(`No se pudo obtener el mapeo dinámico de Traccar. Código de estado: ${response.status}`);
-          }
-        } catch (traccarError: any) {
-          this.logger.error(`Error al consultar dispositivos auxiliares en Traccar: ${traccarError.message}`);
-        }
-      }
-
-      // 4. Estructurar y cargar la caché en memoria
-      let loadedCount = 0;
-      for (const vehicle of vehicles) {
-        if (!vehicle.traccarDeviceId) continue;
-        
-        let traccarIdNum: number | undefined = vehicle.traccarId ?? undefined;
-        
-        if (traccarIdNum === undefined) {
-          // Si no está localmente, intentar obtenerlo del mapeo dinámico auxiliar de Traccar
-          traccarIdNum = traccarDeviceMap.get(vehicle.traccarDeviceId);
-        }
-
-        if (traccarIdNum === undefined) {
-          // Fallback final: intentar parsear como número directamente si nada más funcionó
-          traccarIdNum = parseInt(vehicle.traccarDeviceId, 10);
-          if (isNaN(traccarIdNum)) {
-            this.logger.warn(`Vehículo "${vehicle.plate}" tiene un traccarDeviceId no numérico y no figura en Traccar: "${vehicle.traccarDeviceId}"`);
-            continue;
+          } catch (traccarError: any) {
+            this.logger.error(`Error al consultar dispositivos auxiliares en Traccar: ${traccarError.message}`);
           }
         }
 
-        const ticketData = activeTicketsByVehicle.get(vehicle.id) || null;
+        // 4. Estructurar y cargar la caché en memoria
+        let loadedCount = 0;
+        for (const vehicle of vehicles) {
+          if (!vehicle.traccarDeviceId) continue;
+          
+          let traccarIdNum: number | undefined = vehicle.traccarId ?? undefined;
+          
+          if (traccarIdNum === undefined) {
+            // Si no está localmente, intentar obtenerlo del mapeo dinámico auxiliar de Traccar
+            traccarIdNum = traccarDeviceMap.get(vehicle.traccarDeviceId);
+          }
 
-        const state: CachedVehicleState = {
-          vehicleId: vehicle.id,
-          tenantId: vehicle.tenantId,
-          dailyTicketId: ticketData ? ticketData.ticketId : null,
-          plate: vehicle.plate,
-          driverName: ticketData ? ticketData.driverName : 'No asignado',
-        };
+          if (traccarIdNum === undefined) {
+            // Fallback final: intentar parsear como número directamente si nada más funcionó
+            traccarIdNum = parseInt(vehicle.traccarDeviceId, 10);
+            if (isNaN(traccarIdNum)) {
+              this.logger.warn(`Vehículo "${vehicle.plate}" tiene un traccarDeviceId no numérico y no figura en Traccar: "${vehicle.traccarDeviceId}"`);
+              continue;
+            }
+          }
 
-        this.cache.set(traccarIdNum, state);
-        this.vehicleIdToTraccarId.set(vehicle.id, traccarIdNum);
-        loadedCount++;
+          const ticketData = activeTicketsByVehicle.get(vehicle.id) || null;
+
+          const state: CachedVehicleState = {
+            vehicleId: vehicle.id,
+            tenantId: vehicle.tenantId,
+            dailyTicketId: ticketData ? ticketData.ticketId : null,
+            plate: vehicle.plate,
+            driverName: ticketData ? ticketData.driverName : 'No asignado',
+          };
+
+          this.cache.set(traccarIdNum, state);
+          this.vehicleIdToTraccarId.set(vehicle.id, traccarIdNum);
+          loadedCount++;
+        }
+
+        this.logger.log(`Caché en memoria inicializada exitosamente. ${loadedCount} vehículos cargados.`);
+      } catch (error: any) {
+        this.logger.error(`Error crítico al inicializar la caché de monitoreo: ${error.message}`, error.stack);
       }
+    })();
 
-      this.logger.log(`Caché en memoria inicializada exitosamente. ${loadedCount} vehículos cargados.`);
-    } catch (error: any) {
-      this.logger.error(`Error crítico al inicializar la caché de monitoreo: ${error.message}`, error.stack);
-    }
+    return this.preloadPromise;
   }
 
   /**
@@ -157,6 +167,39 @@ export class VehicleTenantCache implements OnModuleInit {
     const id = typeof traccarDeviceId === 'string' ? parseInt(traccarDeviceId, 10) : traccarDeviceId;
     if (isNaN(id)) return null;
     return this.cache.get(id) || null;
+  }
+
+  /**
+   * Actualiza la última posición conocida de un vehículo en la caché de memoria
+   */
+  updateLastPosition(traccarDeviceId: number | string, position: any): void {
+    const id = typeof traccarDeviceId === 'string' ? parseInt(traccarDeviceId, 10) : traccarDeviceId;
+    if (isNaN(id)) return;
+    const state = this.cache.get(id);
+    if (state) {
+      state.lastPosition = position;
+      this.cache.set(id, state);
+    }
+  }
+
+  /**
+   * Obtiene la última posición conocida enriquecida de toda la flota de un tenant específico
+   */
+  getLatestPositionsByTenant(tenantId: string): any[] {
+    const positions: any[] = [];
+    for (const [_, state] of this.cache.entries()) {
+      if (state.tenantId === tenantId && state.lastPosition) {
+        positions.push({
+          ...state.lastPosition,
+          vehicleId: state.vehicleId,
+          plate: state.plate,
+          driverName: state.driverName,
+          dailyTicketId: state.dailyTicketId,
+          hasActiveTicket: !!state.dailyTicketId,
+        });
+      }
+    }
+    return positions;
   }
 
   /**

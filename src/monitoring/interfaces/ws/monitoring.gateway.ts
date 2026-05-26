@@ -80,6 +80,13 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
       
       this.logger.log(`[Socket.io] Cliente ${socket.id} autenticado con éxito para Tenant: "${tenantId}". Unido a la sala.`);
 
+      // 4. State Cache: Emitir instantáneamente las últimas posiciones conocidas del tenant (evento positions)
+      const initialPositions = this.vehicleTenantCache.getLatestPositionsByTenant(tenantId);
+      if (initialPositions.length > 0) {
+        socket.emit('positions', initialPositions);
+        this.logger.log(`[Socket.io] Latencia Cero: Enviadas ${initialPositions.length} posiciones iniciales en caliente al cliente ${socket.id}`);
+      }
+
     } catch (error: any) {
       this.logger.error(`[Socket.io] Excepción al establecer conexión en cliente ${socket.id}: ${error.message}`);
       socket.disconnect();
@@ -98,6 +105,9 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
 
           for (const pos of positions) {
             if (!pos.deviceId) continue;
+
+            // 1. Actualizar el State Cache en memoria con la última posición del vehículo
+            this.vehicleTenantCache.updateLastPosition(pos.deviceId, pos);
 
             const state = this.vehicleTenantCache.getVehicleState(pos.deviceId);
             if (!state) {

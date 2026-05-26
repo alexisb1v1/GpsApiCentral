@@ -103,8 +103,8 @@ export class TraccarProvider implements ITraccarProvider {
   }
 
   async getGeofences(groupId?: number): Promise<Result<TraccarGeofence[], Error>> {
-    const url = groupId 
-      ? `${this.baseUrl}/api/geofences?groupId=${groupId}` 
+    const url = groupId
+      ? `${this.baseUrl}/api/geofences?groupId=${groupId}`
       : `${this.baseUrl}/api/geofences`;
     this.logger.log(`Obteniendo geocercas de Traccar... (groupId: ${groupId ?? 'todas'})`);
 
@@ -233,6 +233,32 @@ export class TraccarProvider implements ITraccarProvider {
 
     } catch (error: any) {
       this.logger.error(`Excepción crítica al verificar dispositivo en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
+  async getDevicePositions(traccarDeviceId: number, from: Date, to: Date): Promise<Result<any[], Error>> {
+    const url = `${this.baseUrl}/api/positions?deviceId=${traccarDeviceId}&from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
+    this.logger.log(`Obteniendo posiciones de Traccar para dispositivo ID: ${traccarDeviceId} en rango [${from.toISOString()} - ${to.toISOString()}]`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al obtener posiciones para ID ${traccarDeviceId}: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      const positions = (await response.json()) as any[];
+      this.logger.log(`Obtenidas ${positions.length} posiciones para el dispositivo ID ${traccarDeviceId}`);
+      return ok(positions);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al obtener posiciones en Traccar para ID ${traccarDeviceId}: ${error.message}`);
       return err(new Error(`Excepción en conector Traccar: ${error.message}`));
     }
   }

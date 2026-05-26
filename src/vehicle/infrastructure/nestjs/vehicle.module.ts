@@ -16,6 +16,7 @@ import { DeleteVehicleHandler } from '@vehicle/application/commands/v1/delete-ve
 // Queries
 import { GetVehicleByIdHandler } from '@vehicle/application/queries/v1/get-vehicle-by-id/handlers/get-vehicle-by-id.handler';
 import { GetVehiclesListHandler } from '@vehicle/application/queries/v1/get-vehicles-list/handlers/get-vehicles-list.handler';
+import { GetVehicleRouteHandler } from '@vehicle/application/queries/v1/get-vehicle-route/handlers/get-vehicle-route.handler';
 
 // Controllers
 import { CreateVehicleController } from '@vehicle/interfaces/http/v1/create-vehicle/create-vehicle.controller';
@@ -25,6 +26,7 @@ import { DeleteVehicleController } from '@vehicle/interfaces/http/v1/delete-vehi
 import { GetVehicleByIdController } from '@vehicle/interfaces/http/v1/get-vehicle-by-id/get-vehicle-by-id.controller';
 import { GetVehiclesListController } from '@vehicle/interfaces/http/v1/get-vehicles-list/get-vehicles-list.controller';
 import { VehicleDocumentsController } from '@vehicle/interfaces/http/v1/vehicle-documents/vehicle-documents.controller';
+import { GetVehicleRouteController } from '@vehicle/interfaces/http/v1/get-vehicle-route/get-vehicle-route.controller';
 
 // Handlers Documents
 import { CreateVehicleDocumentHandler } from '@vehicle/application/commands/v1/create-vehicle-document/handlers/create-vehicle-document.handler';
@@ -38,6 +40,7 @@ const Handlers = [
   DeleteVehicleHandler,
   GetVehicleByIdHandler,
   GetVehiclesListHandler,
+  GetVehicleRouteHandler,
   CreateVehicleDocumentHandler,
   DeleteVehicleDocumentHandler,
   GetVehicleDocumentsHandler,
@@ -68,6 +71,7 @@ const Repositories = [
     GetVehicleByIdController,
     GetVehiclesListController,
     VehicleDocumentsController,
+    GetVehicleRouteController,
   ],
   providers: [
     ...Repositories,
