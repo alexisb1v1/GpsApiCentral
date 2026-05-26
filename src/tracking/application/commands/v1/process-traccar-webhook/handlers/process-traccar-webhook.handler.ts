@@ -1,6 +1,8 @@
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CommandHandler, ICommandHandler, EventBus } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { ProcessTraccarWebhookCommand } from '../process-traccar-webhook.command';
+import { randomUUID } from 'crypto';
+import { DriverNotificationSentEvent } from '../../../../../../monitoring/domain/events/driver-notification-sent.event';
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketRepository } from '@daily-ticket/domain/repositories/daily-ticket.repository';
@@ -35,6 +37,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     private readonly vehicleTypeOrmRepository: Repository<VehicleEntity>,
     @InjectRepository(DailyRoundEntity)
     private readonly dailyRoundRepository: Repository<DailyRoundEntity>,
+    private readonly eventBus: EventBus,
   ) {}
 
   async execute(command: ProcessTraccarWebhookCommand): Promise<void> {
@@ -167,6 +170,23 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
       infraction.description = `Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
       
       await this.infractionRepository.save(infraction);
+
+      if (ticket.driverId) {
+        this.eventBus.publish(
+          new DriverNotificationSentEvent(ticket.driverId, {
+            id: randomUUID(),
+            type: 'INFRACTION',
+            title: 'Alerta de Infracción',
+            message: infraction.description,
+            timestamp: new Date(),
+            data: {
+              infractionId: infraction.id,
+              amount: infraction.amount,
+              delayMinutes: Math.round(delayMinutes),
+            },
+          }),
+        );
+      }
     }
   }
 }

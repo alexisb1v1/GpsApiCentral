@@ -108,6 +108,20 @@ export class DriverGateway implements OnGatewayConnection, OnGatewayInit, OnModu
   }
 
   /**
+   * Envía una notificación unificada y tipada en tiempo real al chofer
+   */
+  emitNotificationToDriver(driverId: string, notification: any) {
+    try {
+      if (this.server) {
+        this.server.to(`driver:${driverId}`).emit('notification', notification);
+        this.logger.log(`[Driver WS] Enviada notificación de tipo [${notification.type}] al chofer ${driverId}`);
+      }
+    } catch (error: any) {
+      this.logger.error(`[Driver WS] Error al notificar al chofer ${driverId}: ${error.message}`);
+    }
+  }
+
+  /**
    * Se suscribe a los cambios de caché para retransmitir asignaciones de vehículos en caliente al chofer
    */
   private subscribeToCacheUpdates() {
