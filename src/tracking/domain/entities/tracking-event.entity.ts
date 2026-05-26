@@ -22,7 +22,7 @@ export class TrackingEventEntity {
   traccarGeofenceId: number | null;
 
   @Column({ name: 'round_id', type: 'uuid', nullable: true })
-  roundId: string;
+  roundId: string | null;
 
   @Column({
     type: 'enum',
@@ -38,6 +38,9 @@ export class TrackingEventEntity {
 
   @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
   longitude: number;
+
+  @Column({ name: 'duration_seconds', type: 'int', nullable: true })
+  durationSeconds: number | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

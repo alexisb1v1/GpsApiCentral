@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TrackingEventEntity } from '../../domain/entities/tracking-event.entity';
 import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
+import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { TraccarWebhookController } from '../../interfaces/http/v1/traccar-webhook/traccar-webhook.controller';
 import { ProcessTraccarWebhookHandler } from '../../application/commands/v1/process-traccar-webhook/handlers/process-traccar-webhook.handler';
 import { VehicleModule } from '@vehicle/infrastructure/nestjs/vehicle.module';
@@ -13,7 +14,13 @@ import { InfractionEntity } from '@infraction/domain/entities/infraction.entity'
 @Module({
   imports: [
     CqrsModule,
-    TypeOrmModule.forFeature([TrackingEventEntity, RouteStopEntity, InfractionEntity, DailyRoundEntity]),
+    TypeOrmModule.forFeature([
+      TrackingEventEntity, 
+      RouteStopEntity, 
+      InfractionEntity, 
+      DailyRoundEntity,
+      VehicleEntity
+    ]),
     VehicleModule,
     DailyTicketModule,
   ],
