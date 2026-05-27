@@ -32,6 +32,8 @@ export class VehicleTenantCache implements OnModuleInit {
   private readonly vehicleIdToTraccarId = new Map<string, number>();
 
   private preloadPromise: Promise<void> | null = null;
+  private lastLoadDate: string | null = null;
+  private midnightTimeout: NodeJS.Timeout | null = null;
 
 
   constructor(
@@ -44,6 +46,7 @@ export class VehicleTenantCache implements OnModuleInit {
 
   async onModuleInit() {
     await this.preloadCache();
+    this.scheduleMidnightReset();
   }
 
   /**
@@ -175,7 +178,8 @@ export class VehicleTenantCache implements OnModuleInit {
           loadedCount++;
         }
 
-        this.logger.log(`Caché en memoria inicializada exitosamente. ${loadedCount} vehículos cargados.`);
+        this.lastLoadDate = todayStr;
+        this.logger.log(`Caché en memoria inicializada exitosamente para el día ${todayStr}. ${loadedCount} vehículos cargados.`);
       } catch (error: any) {
         this.logger.error(`Error crítico al inicializar la caché de monitoreo: ${error.message}`, error.stack);
       }
@@ -188,6 +192,9 @@ export class VehicleTenantCache implements OnModuleInit {
    * Obtiene el estado en memoria de un vehículo a partir de su ID de Traccar
    */
   getVehicleState(traccarDeviceId: number | string): CachedVehicleState | null {
+    this.checkAndResetCacheIfNewDay().catch(err => 
+      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
+    );
     const id = typeof traccarDeviceId === 'string' ? parseInt(traccarDeviceId, 10) : traccarDeviceId;
     if (isNaN(id)) return null;
     return this.cache.get(id) || null;
@@ -197,6 +204,9 @@ export class VehicleTenantCache implements OnModuleInit {
    * Actualiza la última posición conocida de un vehículo en la caché de memoria
    */
   updateLastPosition(traccarDeviceId: number | string, position: any): void {
+    this.checkAndResetCacheIfNewDay().catch(err => 
+      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
+    );
     const id = typeof traccarDeviceId === 'string' ? parseInt(traccarDeviceId, 10) : traccarDeviceId;
     if (isNaN(id)) return;
     const state = this.cache.get(id);
@@ -210,6 +220,9 @@ export class VehicleTenantCache implements OnModuleInit {
    * Obtiene la última posición conocida enriquecida de toda la flota de un tenant específico
    */
   getLatestPositionsByTenant(tenantId: string): any[] {
+    this.checkAndResetCacheIfNewDay().catch(err => 
+      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
+    );
     const positions: any[] = [];
     for (const [_, state] of this.cache.entries()) {
       if (state.tenantId === tenantId && state.lastPosition) {
@@ -233,6 +246,9 @@ export class VehicleTenantCache implements OnModuleInit {
    * Obtiene la última posición conocida enriquecida del vehículo asignado a un conductor específico
    */
   getLatestPositionByDriver(driverId: string): any | null {
+    this.checkAndResetCacheIfNewDay().catch(err => 
+      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
+    );
     for (const [_, state] of this.cache.entries()) {
       if (state.driverId === driverId && state.lastPosition) {
         return {
@@ -256,6 +272,7 @@ export class VehicleTenantCache implements OnModuleInit {
    * Registra o actualiza en caliente el ticket diario de un vehículo en la caché
    */
   async setDailyTicketId(vehicleId: string, dailyTicketId: string | null): Promise<void> {
+    await this.checkAndResetCacheIfNewDay();
     const traccarId = this.vehicleIdToTraccarId.get(vehicleId);
     if (traccarId === undefined) {
       this.logger.warn(`Intento de actualizar ticket para vehículo ${vehicleId} pero no existe en caché.`);
@@ -309,8 +326,68 @@ export class VehicleTenantCache implements OnModuleInit {
    * Agrega o actualiza un vehículo completo en la caché (al crearlo o editarlo en el sistema)
    */
   setVehicleState(traccarDeviceId: number, state: CachedVehicleState): void {
+    this.checkAndResetCacheIfNewDay().catch(err => 
+      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
+    );
     this.cache.set(traccarDeviceId, state);
     this.vehicleIdToTraccarId.set(state.vehicleId, traccarDeviceId);
     this.logger.log(`Vehículo registrado en caché de monitoreo: Traccar ID ${traccarDeviceId}`);
+  }
+
+  /**
+   * Valida si el día de hoy difiere del día en que se cargó la caché.
+   * Si es así, realiza un auto-reinicio en segundo plano de manera asíncrona.
+   */
+  private async checkAndResetCacheIfNewDay(): Promise<void> {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const todayStr = formatter.format(new Date());
+
+    if (this.lastLoadDate && this.lastLoadDate !== todayStr) {
+      this.logger.log(`[Cache] Cambio de día detectado (Antes: ${this.lastLoadDate}, Ahora: ${todayStr}). Reiniciando y precargando caché...`);
+      await this.resetCache();
+    }
+  }
+
+  /**
+   * Programa la tarea de medianoche (00:05) de forma autónoma con temporizadores puros.
+   */
+  private scheduleMidnightReset() {
+    if (this.midnightTimeout) {
+      clearTimeout(this.midnightTimeout);
+    }
+
+    const now = new Date();
+    const midnight = new Date();
+    
+    // Programar para las 00:05 de la mañana del día siguiente
+    midnight.setHours(24, 5, 0, 0);
+    const msUntilMidnight = midnight.getTime() - now.getTime();
+
+    this.logger.log(`[Cache] Programando reinicio automático diario de caché en ${Math.round(msUntilMidnight / 1000 / 60)} minutos (a las 00:05).`);
+
+    this.midnightTimeout = setTimeout(async () => {
+      this.logger.log('[Cache] Cron de medianoche activado. Reiniciando caché de tickets para el nuevo día...');
+      try {
+        await this.resetCache();
+      } catch (error: any) {
+        this.logger.error(`[Cache] Error en el reinicio programado a medianoche: ${error.message}`);
+      }
+      // Re-programar de forma recursiva para el próximo día
+      this.scheduleMidnightReset();
+    }, msUntilMidnight);
+  }
+
+  /**
+   * Fuerza el reinicio completo de la caché en memoria y la hidratación desde la base de datos fresca.
+   */
+  async resetCache(): Promise<void> {
+    this.logger.log('[Cache] Forzando el reinicio completo de la caché de vehículos y tickets...');
+    this.preloadPromise = null;
+    await this.preloadCache();
   }
 }

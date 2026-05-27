@@ -33,15 +33,19 @@ export class TraccarSocketService implements OnModuleInit, OnModuleDestroy {
     this.traccarPassword = this.configService.get<string>('TRACCAR_PASSWORD') || 'admin';
   }
 
-  async onModuleInit() {
-    this.logger.log('[Traccar WS] Esperando hidratación máster de caché en memoria antes de abrir el WebSocket...');
-    try {
-      await this.vehicleTenantCache.preloadCache();
-      this.logger.log('[Traccar WS] Caché en memoria hidratado con éxito. Conectando al WebSocket de Traccar...');
-    } catch (cacheError: any) {
-      this.logger.error(`[Traccar WS] Advertencia al precargar el caché: ${cacheError.message}. Se intentará conectar de todas formas.`);
-    }
-    this.connectToTraccar();
+  onModuleInit() {
+    this.logger.log('[Traccar WS] Programando hidratación de caché en segundo plano (no bloqueante)...');
+    
+    // Ejecutar en segundo plano para no bloquear el levantamiento del bootstrap de NestJS
+    Promise.resolve().then(async () => {
+      try {
+        await this.vehicleTenantCache.preloadCache();
+        this.logger.log('[Traccar WS] Caché en memoria hidratado con éxito. Conectando al WebSocket de Traccar...');
+      } catch (cacheError: any) {
+        this.logger.error(`[Traccar WS] Advertencia al precargar el caché: ${cacheError.message}. Se intentará conectar de todas formas.`);
+      }
+      this.connectToTraccar();
+    });
   }
 
   onModuleDestroy() {

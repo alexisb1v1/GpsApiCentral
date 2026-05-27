@@ -11,6 +11,7 @@ import { MonitoringGateway } from './interfaces/ws/monitoring.gateway';
 import { DriverGateway } from './interfaces/ws/driver.gateway';
 import { DailyTicketModule } from '@daily-ticket/infrastructure/nestjs/daily-ticket.module';
 import { DriverNotificationSentHandler } from './application/events/handlers/driver-notification-sent.handler';
+import { MonitoringCacheController } from './interfaces/http/v1/monitoring-cache.controller';
 
 @Module({
   imports: [
@@ -25,6 +26,9 @@ import { DriverNotificationSentHandler } from './application/events/handlers/dri
     TypeOrmModule.forFeature([VehicleEntity, DailyTicketEntity]),
     // Usamos forwardRef para resolver la dependencia circular con DailyTicketModule
     forwardRef(() => DailyTicketModule),
+  ],
+  controllers: [
+    MonitoringCacheController,
   ],
   providers: [
     VehicleTenantCache,
