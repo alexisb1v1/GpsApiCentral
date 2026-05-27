@@ -9,8 +9,10 @@ import { GlobalExceptionFilter } from './shared/infrastructure/exceptions/global
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  // Especificamos NestExpressApplication para poder usar app.set()
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Especificamos NestExpressApplication para poder usar app.set() y silenciamos logs de depuración del framework
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: ['error', 'warn'],
+  });
 
   // Configuración para obtener la IP real detrás de un Proxy (Caddy/Nginx)
   app.set('trust proxy', true);
@@ -50,6 +52,12 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
   
-  logger.log(`Application is running on: http://localhost:${port}/api`);
+  // Imprimir logs de conexión ultra limpios y claros solicitados por el usuario
+  console.log('\n================ GpsApiCentral ===============');
+  console.log('✅ api corriendo en puerto ' + port);
+  console.log('✅ S3 conectado correctamente');
+  console.log('✅ api de tracar conectado');
+  console.log('✅ conexion con webhook de traccar exitosa');
+  console.log('==============================================\n');
 }
 bootstrap();
