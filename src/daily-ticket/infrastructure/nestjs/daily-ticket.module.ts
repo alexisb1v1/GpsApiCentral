@@ -10,6 +10,7 @@ import { CreateDailyTicketHandler } from '../../application/commands/v1/create-d
 import { GetDailyTicketsHandler } from '../../application/queries/v1/get-daily-tickets/handlers/get-daily-tickets.handler';
 import { VehicleModule } from '@vehicle/infrastructure/nestjs/vehicle.module';
 import { MonitoringModule } from '../../../monitoring/monitoring.module';
+import { PaymentModule } from '../../../payment/infrastructure/nestjs/payment.module';
 
 const CommandHandlers = [CreateDailyTicketHandler];
 const QueryHandlers = [GetDailyTicketsHandler];
@@ -19,6 +20,7 @@ const QueryHandlers = [GetDailyTicketsHandler];
     CqrsModule,
     TypeOrmModule.forFeature([DailyTicketEntity, DailyRoundEntity]),
     VehicleModule,
+    PaymentModule,
     forwardRef(() => MonitoringModule),
   ],
   controllers: [CreateDailyTicketController, GetDailyTicketsController],

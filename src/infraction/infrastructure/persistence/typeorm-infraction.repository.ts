@@ -42,4 +42,37 @@ export class TypeOrmInfractionRepository implements InfractionRepository {
       return err('INTERNAL_ERROR');
     }
   }
+
+  async findFiltered(filters: {
+    tenantId?: string;
+    driverId?: string;
+    date?: string;
+  }): Promise<Result<InfractionEntity[], AppError>> {
+    try {
+      const queryBuilder = this.repository.createQueryBuilder('infraction')
+        .leftJoinAndSelect('infraction.vehicle', 'vehicle');
+
+      if (filters.tenantId) {
+        queryBuilder.andWhere('infraction.tenantId = :tenantId', { tenantId: filters.tenantId });
+      }
+
+      if (filters.driverId) {
+        queryBuilder.andWhere('infraction.userId = :driverId', { driverId: filters.driverId });
+      }
+
+      if (filters.date) {
+        const startDate = `${filters.date} 00:00:00`;
+        const endDate = `${filters.date} 23:59:59`;
+        queryBuilder.andWhere('infraction.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate });
+      }
+
+      queryBuilder.orderBy('infraction.createdAt', 'DESC');
+
+      const infractions = await queryBuilder.getMany();
+      return ok(infractions);
+    } catch (error) {
+      console.error('Error in findFiltered:', error);
+      return err('INTERNAL_ERROR');
+    }
+  }
 }

@@ -17,6 +17,7 @@ import { TrackingModule } from './tracking/infrastructure/nestjs/tracking.module
 import { StorageModule } from '@shared/infrastructure/storage/storage.module';
 import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
+import { PaymentModule } from './payment/infrastructure/nestjs/payment.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { MonitoringModule } from './monitoring/monitoring.module';
     DriverModule,
     InfractionModule,
     DailyTicketModule,
+    PaymentModule,
     RouteModule,
     TrackingModule,
     StorageModule,

@@ -1,5 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
+import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 
 export enum InfractionType {
   PIRATERIA = 'PIRATERIA',
@@ -27,6 +29,12 @@ export class InfractionEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
+  @Column({ name: 'daily_ticket_id', type: 'uuid' })
+  dailyTicketId: string;
+
+  @Column({ name: 'round_id', type: 'uuid', nullable: true })
+  roundId: string | null;
+
   @Column({
     type: 'enum',
     enum: InfractionType,
@@ -49,13 +57,18 @@ export class InfractionEntity {
   @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
   cancellationReason: string | null;
 
-  @Column({ name: 'payment_id', type: 'varchar', length: 100, nullable: true })
-  paymentId: string | null;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
   @ManyToOne(() => VehicleEntity)
   @JoinColumn({ name: 'vehicle_id' })
   vehicle: VehicleEntity;
+
+  @ManyToOne(() => DailyTicketEntity)
+  @JoinColumn({ name: 'daily_ticket_id' })
+  dailyTicket: DailyTicketEntity;
+
+  @ManyToOne(() => DailyRoundEntity, { nullable: true })
+  @JoinColumn({ name: 'round_id' })
+  round: DailyRoundEntity | null;
 }

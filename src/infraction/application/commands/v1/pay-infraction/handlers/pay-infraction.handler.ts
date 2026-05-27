@@ -6,12 +6,16 @@ import { InfractionRepository } from '@infraction/domain/repositories/infraction
 import { InfractionStatus } from '@infraction/domain/entities/infraction.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { PaymentRepository } from '../../../../../../payment/domain/repositories/payment.repository';
+import { PaymentEntity } from '../../../../../../payment/domain/entities/payment.entity';
 
 @CommandHandler(PayInfractionCommand)
 export class PayInfractionHandler implements ICommandHandler<PayInfractionCommand> {
   constructor(
     @Inject('InfractionRepository')
     private readonly infractionRepository: InfractionRepository,
+    @Inject('PaymentRepository')
+    private readonly paymentRepository: PaymentRepository,
     private readonly auditService: AuditService,
   ) {}
 
@@ -37,11 +41,25 @@ export class PayInfractionHandler implements ICommandHandler<PayInfractionComman
 
     // 5. Actualizar estado
     infraction.status = InfractionStatus.PAID;
-    infraction.paymentId = command.paymentId || null;
 
     // 6. Guardar cambios
     const saveResult = await this.infractionRepository.save(infraction);
     if (saveResult.isErr()) return err(saveResult.error);
+
+    // 6.1 Crear y guardar el pago asociado en la nueva tabla 'payments'
+    const payment = new PaymentEntity();
+    payment.tenantId = infraction.tenantId;
+    payment.dailyTicketId = null;
+    payment.infractionId = infraction.id;
+    payment.amount = infraction.amount;
+    payment.paymentMethod = 'EFECTIVO'; // Método por defecto
+    payment.operationReference = command.paymentId || null; // La referencia/ID externa pasa aquí
+    payment.registeredBy = command.userId;
+
+    const paymentSaveResult = await this.paymentRepository.save(payment);
+    if (paymentSaveResult.isErr()) {
+      console.error('Error al registrar el pago de la infracción en payments:', paymentSaveResult.error);
+    }
 
     // 7. Registrar en auditoría
     this.auditService.createLog({

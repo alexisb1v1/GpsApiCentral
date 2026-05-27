@@ -6,4 +6,9 @@ export interface InfractionRepository {
   save(infraction: InfractionEntity): Promise<Result<InfractionEntity, AppError>>;
   findById(id: string): Promise<Result<InfractionEntity, AppError>>;
   findByVehicleId(vehicleId: string): Promise<Result<InfractionEntity[], AppError>>;
+  findFiltered(filters: {
+    tenantId?: string;
+    driverId?: string;
+    date?: string;
+  }): Promise<Result<InfractionEntity[], AppError>>;
 }

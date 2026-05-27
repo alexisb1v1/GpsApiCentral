@@ -17,6 +17,9 @@ export class DailyTicketEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ name: 'ticket_number', type: 'varchar', length: 50 })
+  ticketNumber: string;
+
   @Column({ name: 'vehicle_id', type: 'uuid' })
   vehicleId: string;
 
@@ -50,12 +53,6 @@ export class DailyTicketEntity {
 
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
-
-  @Column({ name: 'payment_method', type: 'varchar', length: 20, default: 'EFECTIVO' })
-  paymentMethod: string;
-
-  @Column({ name: 'payment_reference', type: 'varchar', length: 50, nullable: true })
-  paymentReference: string | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

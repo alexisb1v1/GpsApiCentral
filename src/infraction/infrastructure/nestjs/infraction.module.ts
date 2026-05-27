@@ -7,12 +7,15 @@ import { TypeOrmInfractionRepository } from '../persistence/typeorm-infraction.r
 import { CreateInfractionHandler } from '@infraction/application/commands/v1/create-infraction/handlers/create-infraction.handler';
 import { SharedModule } from '@shared/infrastructure/nestjs/shared.module';
 import { VehicleModule } from '@vehicle/infrastructure/nestjs/vehicle.module';
+import { PaymentModule } from '../../../payment/infrastructure/nestjs/payment.module';
 import { PayInfractionController } from '../../interfaces/http/v1/pay-infraction/pay-infraction.controller';
 import { PayInfractionHandler } from '@infraction/application/commands/v1/pay-infraction/handlers/pay-infraction.handler';
 import { AnnulInfractionController } from '../../interfaces/http/v1/annul-infraction/annul-infraction.controller';
 import { AnnulInfractionHandler } from '@infraction/application/commands/v1/annul-infraction/handlers/annul-infraction.handler';
+import { GetInfractionsController } from '../../interfaces/http/v1/get-infractions/get-infractions.controller';
+import { GetInfractionsHandler } from '@infraction/application/queries/v1/get-infractions/get-infractions.handler';
 
-const Handlers = [CreateInfractionHandler, PayInfractionHandler, AnnulInfractionHandler];
+const Handlers = [CreateInfractionHandler, PayInfractionHandler, AnnulInfractionHandler, GetInfractionsHandler];
 
 const Repositories = [
   {
@@ -27,11 +30,13 @@ const Repositories = [
     CqrsModule,
     SharedModule,
     VehicleModule,
+    PaymentModule,
   ],
   controllers: [
     CreateInfractionController,
     PayInfractionController,
     AnnulInfractionController,
+    GetInfractionsController,
   ],
   providers: [...Repositories, ...Handlers],
   exports: ['InfractionRepository'],
