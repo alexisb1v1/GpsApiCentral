@@ -1,26 +1,27 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { PayInfractionCommand } from '../pay-infraction.command';
 import { InfractionRepository } from '@infraction/domain/repositories/infraction.repository';
-import { InfractionStatus } from '@infraction/domain/entities/infraction.entity';
+import { InfractionEntity, InfractionStatus } from '@infraction/domain/entities/infraction.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
-import { PaymentRepository } from '../../../../../../payment/domain/repositories/payment.repository';
 import { PaymentEntity } from '../../../../../../payment/domain/entities/payment.entity';
+import { DocumentSequenceEntity } from '@shared/domain/entities/document-sequence.entity';
+import { DocumentTypeConstants } from '@shared/domain/constants/document-type.constants';
 
 @CommandHandler(PayInfractionCommand)
 export class PayInfractionHandler implements ICommandHandler<PayInfractionCommand> {
   constructor(
+    private readonly dataSource: DataSource,
     @Inject('InfractionRepository')
     private readonly infractionRepository: InfractionRepository,
-    @Inject('PaymentRepository')
-    private readonly paymentRepository: PaymentRepository,
     private readonly auditService: AuditService,
   ) {}
 
   async execute(command: PayInfractionCommand): Promise<Result<boolean, AppError>> {
-    // 1. Buscar la infracción
+    // 1. Buscar la infracción (fuera de la transacción para reducir el tiempo de bloqueo de recursos)
     const infractionResult = await this.infractionRepository.findById(command.infractionId);
     if (infractionResult.isErr()) return err(infractionResult.error);
 
@@ -36,44 +37,98 @@ export class PayInfractionHandler implements ICommandHandler<PayInfractionComman
       return err('INVALID_INPUT');
     }
 
-    // 4. Clonar estado anterior para auditoría
     const oldValues = { ...infraction };
 
-    // 5. Actualizar estado
-    infraction.status = InfractionStatus.PAID;
+    // 4. Iniciar transacción manual para control de secuencias y pessimistic locking
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // 6. Guardar cambios
-    const saveResult = await this.infractionRepository.save(infraction);
-    if (saveResult.isErr()) return err(saveResult.error);
+    try {
+      // A. Bloquear y leer la secuencia de pago (PAYMENT_RECEIPT) con autoinicialización defensiva
+      let paymentSequence = await queryRunner.manager.createQueryBuilder(DocumentSequenceEntity, 'seq')
+        .setLock('pessimistic_write') // FOR UPDATE
+        .where('seq.tenantId = :tenantId AND seq.documentType = :docType', {
+          tenantId: command.tenantId,
+          docType: DocumentTypeConstants.PAYMENT_RECEIPT,
+        })
+        .getOne();
 
-    // 6.1 Crear y guardar el pago asociado en la nueva tabla 'payments'
-    const payment = new PaymentEntity();
-    payment.tenantId = infraction.tenantId;
-    payment.dailyTicketId = null;
-    payment.infractionId = infraction.id;
-    payment.amount = infraction.amount;
-    payment.paymentMethod = 'EFECTIVO'; // Método por defecto
-    payment.operationReference = command.paymentId || null; // La referencia/ID externa pasa aquí
-    payment.registeredBy = command.userId;
+      if (!paymentSequence) {
+        // Inicializar dinámicamente si no existe en la base de datos
+        paymentSequence = new DocumentSequenceEntity();
+        paymentSequence.tenantId = command.tenantId;
+        paymentSequence.documentType = DocumentTypeConstants.PAYMENT_RECEIPT;
+        paymentSequence.currentValue = 0;
+        paymentSequence.prefix = 'PAG-';
+        await queryRunner.manager.save(paymentSequence);
 
-    const paymentSaveResult = await this.paymentRepository.save(payment);
-    if (paymentSaveResult.isErr()) {
-      console.error('Error al registrar el pago de la infracción en payments:', paymentSaveResult.error);
+        // Bloquearla nuevamente
+        paymentSequence = await queryRunner.manager.createQueryBuilder(DocumentSequenceEntity, 'seq')
+          .setLock('pessimistic_write')
+          .where('seq.tenantId = :tenantId AND seq.documentType = :docType', {
+            tenantId: command.tenantId,
+            docType: DocumentTypeConstants.PAYMENT_RECEIPT,
+          })
+          .getOne();
+      }
+
+      if (!paymentSequence) {
+        throw new Error('SEQUENCE_NOT_FOUND');
+      }
+
+      // B. Incrementar y generar el número de pago formateado
+      const nextPaymentValue = paymentSequence.currentValue + 1;
+      const paymentPrefix = paymentSequence.prefix || 'PAG-';
+      const paddedPaymentNumber = String(nextPaymentValue).padStart(6, '0');
+      const paymentNumber = `${paymentPrefix}${paddedPaymentNumber}`;
+
+      // C. Actualizar estado de la infracción en la base de datos
+      infraction.status = InfractionStatus.PAID;
+      const savedInfraction = await queryRunner.manager.save(InfractionEntity, infraction);
+
+      // D. Crear e insertar el pago en la tabla payments
+      const payment = new PaymentEntity();
+      payment.tenantId = savedInfraction.tenantId;
+      payment.dailyTicketId = savedInfraction.dailyTicketId;
+      payment.infractionId = savedInfraction.id;
+      payment.amount = savedInfraction.amount;
+      payment.paymentMethod = 'EFECTIVO'; // Método por defecto
+      payment.operationReference = command.paymentId || null;
+      payment.registeredBy = command.userId;
+      payment.paymentNumber = paymentNumber;
+
+      await queryRunner.manager.save(payment);
+
+      // E. Actualizar el contador de secuencia de pago
+      paymentSequence.currentValue = nextPaymentValue;
+      await queryRunner.manager.save(paymentSequence);
+
+      // F. Hacer commit de la transacción
+      await queryRunner.commitTransaction();
+
+      // 5. Registrar en auditoría
+      this.auditService.createLog({
+        tenantId: command.tenantId,
+        userId: command.userId,
+        action: 'PAY_INFRACTION',
+        entityName: 'infractions',
+        entityId: infraction.id,
+        oldValues: oldValues,
+        newValues: infraction,
+        ipAddress: command.ipAddress,
+        userAgent: command.userAgent,
+      });
+
+      return ok(true);
+    } catch (error: any) {
+      // Rollback en caso de cualquier error
+      await queryRunner.rollbackTransaction();
+      console.error('Error transaccional al pagar infracción:', error);
+      return err('INTERNAL_ERROR');
+    } finally {
+      // Liberar query runner
+      await queryRunner.release();
     }
-
-    // 7. Registrar en auditoría
-    this.auditService.createLog({
-      tenantId: command.tenantId,
-      userId: command.userId,
-      action: 'PAY_INFRACTION',
-      entityName: 'infractions',
-      entityId: infraction.id,
-      oldValues: oldValues,
-      newValues: infraction,
-      ipAddress: command.ipAddress,
-      userAgent: command.userAgent,
-    });
-
-    return ok(true);
   }
 }

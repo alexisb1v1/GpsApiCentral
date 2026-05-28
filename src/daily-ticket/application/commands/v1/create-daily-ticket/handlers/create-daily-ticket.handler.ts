@@ -12,6 +12,7 @@ import { AuditService } from '@shared/application/services/audit.service';
 import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
 import { DocumentSequenceEntity } from '@shared/domain/entities/document-sequence.entity';
 import { PaymentEntity } from '../../../../../../payment/domain/entities/payment.entity';
+import { DocumentTypeConstants } from '@shared/domain/constants/document-type.constants';
 
 @CommandHandler(CreateDailyTicketCommand)
 export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTicketCommand> {
@@ -55,11 +56,42 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
         .setLock('pessimistic_write') // FOR UPDATE
         .where('seq.tenantId = :tenantId AND seq.documentType = :docType', {
           tenantId: command.tenantId,
-          docType: 'DAILY_TICKET',
+          docType: DocumentTypeConstants.DAILY_TICKET,
         })
         .getOne();
 
       if (!sequence) {
+        throw new Error('SEQUENCE_NOT_FOUND');
+      }
+
+      // A.1 Bloquear y leer la secuencia de pago (PAYMENT_RECEIPT) con autoinicialización defensiva
+      let paymentSequence = await queryRunner.manager.createQueryBuilder(DocumentSequenceEntity, 'seq')
+        .setLock('pessimistic_write')
+        .where('seq.tenantId = :tenantId AND seq.documentType = :docType', {
+          tenantId: command.tenantId,
+          docType: DocumentTypeConstants.PAYMENT_RECEIPT,
+        })
+        .getOne();
+
+      if (!paymentSequence) {
+        // Inicializar dinámicamente si no existe
+        paymentSequence = new DocumentSequenceEntity();
+        paymentSequence.tenantId = command.tenantId;
+        paymentSequence.documentType = DocumentTypeConstants.PAYMENT_RECEIPT;
+        paymentSequence.currentValue = 0;
+        paymentSequence.prefix = 'PAG-';
+        await queryRunner.manager.save(paymentSequence);
+
+        paymentSequence = await queryRunner.manager.createQueryBuilder(DocumentSequenceEntity, 'seq')
+          .setLock('pessimistic_write')
+          .where('seq.tenantId = :tenantId AND seq.documentType = :docType', {
+            tenantId: command.tenantId,
+            docType: DocumentTypeConstants.PAYMENT_RECEIPT,
+          })
+          .getOne();
+      }
+
+      if (!paymentSequence) {
         throw new Error('SEQUENCE_NOT_FOUND');
       }
 
@@ -68,6 +100,12 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
       const prefix = sequence.prefix || '';
       const paddedNumber = String(nextValue).padStart(6, '0');
       const ticketNumber = `${prefix}${paddedNumber}`;
+
+      // B.1 Incrementar y generar el número de pago formateado
+      const nextPaymentValue = paymentSequence.currentValue + 1;
+      const paymentPrefix = paymentSequence.prefix || 'TK-';
+      const paddedPaymentNumber = String(nextPaymentValue).padStart(6, '0');
+      const paymentNumber = `${paymentPrefix}${paddedPaymentNumber}`;
 
       // C. Crear e insertar el ticket diario
       const ticket = new DailyTicketEntity();
@@ -103,12 +141,16 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
       payment.paymentMethod = command.paymentMethod || 'EFECTIVO';
       payment.operationReference = command.paymentReference || null;
       payment.registeredBy = command.userId;
+      payment.paymentNumber = paymentNumber;
 
       await queryRunner.manager.save(payment);
 
-      // F. Actualizar el contador de secuencia en la base de datos
+      // F. Actualizar los contadores de secuencia en la base de datos
       sequence.currentValue = nextValue;
       await queryRunner.manager.save(sequence);
+
+      paymentSequence.currentValue = nextPaymentValue;
+      await queryRunner.manager.save(paymentSequence);
 
       // G. Hacer commit de la transacción
       await queryRunner.commitTransaction();

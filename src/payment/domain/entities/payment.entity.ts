@@ -27,6 +27,9 @@ export class PaymentEntity {
   @Column({ name: 'operation_reference', type: 'varchar', length: 100, nullable: true })
   operationReference: string | null;
 
+  @Column({ name: 'payment_number', type: 'varchar', length: 50, nullable: true })
+  paymentNumber: string | null;
+
   @Column({ name: 'registered_by', type: 'uuid' })
   registeredBy: string;
 
