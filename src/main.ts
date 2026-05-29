@@ -28,30 +28,18 @@ async function bootstrap() {
 
   app.enableCors({
     origin: function (origin, callback) {
-      // Si no hay origin (ej. peticiones desde Postman o backend a backend), lo dejamos pasar
       if (!origin) {
         return callback(null, true);
       }
 
-      try {
-        const parsedUrl = new URL(origin);
-        const hostname = parsedUrl.hostname;
-
-        // REGLA A: ¿Es el dominio base o un subdominio de nuestro SaaS? (ej. transporte.centralafbv.com)
-        if (hostname === 'centralafbv.com' || hostname.endsWith(saasBaseDomain)) {
-          return callback(null, true);
-        }
-      } catch (e) {
-        // En caso de que no sea una URL parseable, denegamos por seguridad
-        return callback(new Error('Bloqueado por políticas de CORS: Origen Inválido'), false);
+      if (origin.endsWith(saasBaseDomain) || origin === 'https://centralafbv.com') {
+        return callback(null, true);
       }
 
-      // REGLA B: ¿Está en la lista de permitidos específicos? (ej. localhost)
       if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true);
       }
 
-      // Si no cumple nada, bloqueamos el acceso
       callback(new Error('Bloqueado por políticas de CORS'), false);
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

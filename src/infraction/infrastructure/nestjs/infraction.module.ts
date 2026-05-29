@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
 import { InfractionEntity } from '@infraction/domain/entities/infraction.entity';
+import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { CreateInfractionController } from '../../interfaces/http/v1/create-infraction/create-infraction.controller';
 import { TypeOrmInfractionRepository } from '../persistence/typeorm-infraction.repository';
 import { CreateInfractionHandler } from '@infraction/application/commands/v1/create-infraction/handlers/create-infraction.handler';
@@ -26,7 +27,7 @@ const Repositories = [
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([InfractionEntity]),
+    TypeOrmModule.forFeature([InfractionEntity, DailyTicketEntity]),
     CqrsModule,
     SharedModule,
     VehicleModule,
