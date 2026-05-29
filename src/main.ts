@@ -19,7 +19,44 @@ async function bootstrap() {
 
   // Seguridad
   app.use(helmet());
-  app.enableCors();
+
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:3000', 'http://localhost:3001'];
+
+  const saasBaseDomain = '.centralafbv.com';
+
+  app.enableCors({
+    origin: function (origin, callback) {
+      // Si no hay origin (ej. peticiones desde Postman o backend a backend), lo dejamos pasar
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      try {
+        const parsedUrl = new URL(origin);
+        const hostname = parsedUrl.hostname;
+
+        // REGLA A: ¿Es el dominio base o un subdominio de nuestro SaaS? (ej. transporte.centralafbv.com)
+        if (hostname === 'centralafbv.com' || hostname.endsWith(saasBaseDomain)) {
+          return callback(null, true);
+        }
+      } catch (e) {
+        // En caso de que no sea una URL parseable, denegamos por seguridad
+        return callback(new Error('Bloqueado por políticas de CORS: Origen Inválido'), false);
+      }
+
+      // REGLA B: ¿Está en la lista de permitidos específicos? (ej. localhost)
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        return callback(null, true);
+      }
+
+      // Si no cumple nada, bloqueamos el acceso
+      callback(new Error('Bloqueado por políticas de CORS'), false);
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
 
   // Archivos Estáticos
   app.useStaticAssets(join(__dirname, '..', 'public'));
@@ -51,7 +88,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  
+
   // Imprimir logs de conexión ultra limpios y claros solicitados por el usuario
   console.log('\n================ GpsApiCentral ===============');
   console.log('✅ api corriendo en puerto ' + port);

@@ -13,6 +13,9 @@ import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/
 import { DocumentSequenceEntity } from '@shared/domain/entities/document-sequence.entity';
 import { PaymentEntity } from '../../../../../../payment/domain/entities/payment.entity';
 import { DocumentTypeConstants } from '@shared/domain/constants/document-type.constants';
+import { DriverInfoRepository } from '@driver/domain/repositories/driver-info.repository';
+import { RouteRepository } from '../../../../../../route/domain/repositories/route.repository';
+import { UserRepository } from '@user/domain/repositories/user.repository';
 
 @CommandHandler(CreateDailyTicketCommand)
 export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTicketCommand> {
@@ -22,18 +25,54 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
     private readonly dailyTicketRepository: DailyTicketRepository,
     @Inject('VehicleRepository')
     private readonly vehicleRepository: VehicleRepository,
+    @Inject('DriverInfoRepository')
+    private readonly driverInfoRepository: DriverInfoRepository,
+    @Inject('RouteRepository')
+    private readonly routeRepository: RouteRepository,
+    @Inject('UserRepository')
+    private readonly userRepository: UserRepository,
     private readonly auditService: AuditService,
     private readonly vehicleTenantCache: VehicleTenantCache,
   ) { }
 
   async execute(command: CreateDailyTicketCommand): Promise<Result<DailyTicketEntity, AppError>> {
+
     // 1. Validar que el vehículo existe y pertenece al tenant
     const vehicleResult = await this.vehicleRepository.findById(command.vehicleId);
-    if (vehicleResult.isErr()) return err(vehicleResult.error);
+    if (vehicleResult.isErr()) {
+      return err('VEHICLE_NOT_FOUND');
+    }
 
     const vehicle = vehicleResult.value;
     if (vehicle.tenantId !== command.tenantId) {
-      return err('FORBIDDEN');
+      return err('VEHICLE_TENANT_MISMATCH');
+    }
+
+    // 1.1 Validar que el chofer opcional pertenece al mismo tenant
+    if (command.driverId) {
+      const driverUserResult = await this.userRepository.findById(command.driverId);
+      if (driverUserResult.isErr()) {
+        return err('DRIVER_NOT_FOUND');
+      }
+      const driverUser = driverUserResult.value;
+      if (driverUser.role !== 'DRIVER') {
+        return err('DRIVER_NOT_FOUND');
+      }
+      if (driverUser.tenantId !== command.tenantId) {
+        return err('DRIVER_TENANT_MISMATCH');
+      }
+    }
+
+    // 1.2 Validar que la ruta opcional pertenece al mismo tenant
+    if (command.routeId) {
+      const routeResult = await this.routeRepository.findById(command.routeId);
+      if (routeResult.isErr()) {
+        return err('ROUTE_NOT_FOUND');
+      }
+      const route = routeResult.value;
+      if (route.tenantId !== command.tenantId) {
+        return err('ROUTE_TENANT_MISMATCH');
+      }
     }
 
     // 2. Determinar la fecha de trabajo (default hoy)

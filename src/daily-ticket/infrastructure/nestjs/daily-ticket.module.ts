@@ -11,6 +11,9 @@ import { GetDailyTicketsHandler } from '../../application/queries/v1/get-daily-t
 import { VehicleModule } from '@vehicle/infrastructure/nestjs/vehicle.module';
 import { MonitoringModule } from '../../../monitoring/monitoring.module';
 import { PaymentModule } from '../../../payment/infrastructure/nestjs/payment.module';
+import { DriverModule } from '@driver/infrastructure/nestjs/driver.module';
+import { RouteModule } from '../../../route/infrastructure/nestjs/route.module';
+import { UserModule } from '@user/infrastructure/nestjs/user.module';
 
 const CommandHandlers = [CreateDailyTicketHandler];
 const QueryHandlers = [GetDailyTicketsHandler];
@@ -21,6 +24,9 @@ const QueryHandlers = [GetDailyTicketsHandler];
     TypeOrmModule.forFeature([DailyTicketEntity, DailyRoundEntity]),
     VehicleModule,
     PaymentModule,
+    DriverModule,
+    RouteModule,
+    UserModule,
     forwardRef(() => MonitoringModule),
   ],
   controllers: [CreateDailyTicketController, GetDailyTicketsController],
