@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { InfractionEntity, InfractionStatus, InfractionType } from '@infraction/domain/entities/infraction.entity';
+import { Public } from '@shared/infrastructure/decorators/public.decorator';
 
 export class SimulateInfractionRequestDto {
   @ApiProperty({ example: 'driver-user-uuid', description: 'ID del usuario/chofer a notificar' })
@@ -77,6 +78,7 @@ export class CreateInfractionController {
     return matchResult(result);
   }
 
+  @Public()
   @Post('simulate')
   @ApiOperation({ summary: 'Simular y guardar notificación en tiempo real a la app del chofer (Pruebas Internas)' })
   async simulateNotification(@Body() dto: SimulateInfractionRequestDto) {
