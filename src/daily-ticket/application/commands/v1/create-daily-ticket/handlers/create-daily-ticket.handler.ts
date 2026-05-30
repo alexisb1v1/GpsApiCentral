@@ -108,7 +108,7 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
         .setLock('pessimistic_write')
         .where('seq.tenantId = :tenantId AND seq.documentType = :docType', {
           tenantId: command.tenantId,
-          docType: DocumentTypeConstants.PAYMENT_RECEIPT,
+          docType: DocumentTypeConstants.DAILY_TICKET,
         })
         .getOne();
 
@@ -116,16 +116,16 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
         // Inicializar dinámicamente si no existe
         paymentSequence = new DocumentSequenceEntity();
         paymentSequence.tenantId = command.tenantId;
-        paymentSequence.documentType = DocumentTypeConstants.PAYMENT_RECEIPT;
+        paymentSequence.documentType = DocumentTypeConstants.DAILY_TICKET;
         paymentSequence.currentValue = 0;
-        paymentSequence.prefix = 'PAG-';
+        paymentSequence.prefix = 'TK-';
         await queryRunner.manager.save(paymentSequence);
 
         paymentSequence = await queryRunner.manager.createQueryBuilder(DocumentSequenceEntity, 'seq')
           .setLock('pessimistic_write')
           .where('seq.tenantId = :tenantId AND seq.documentType = :docType', {
             tenantId: command.tenantId,
-            docType: DocumentTypeConstants.PAYMENT_RECEIPT,
+            docType: DocumentTypeConstants.DAILY_TICKET,
           })
           .getOne();
       }
@@ -175,7 +175,6 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
       const payment = new PaymentEntity();
       payment.tenantId = command.tenantId;
       payment.dailyTicketId = savedTicket.id;
-      payment.infractionId = null;
       payment.amount = savedTicket.totalAmount;
       payment.paymentMethod = command.paymentMethod || 'EFECTIVO';
       payment.operationReference = command.paymentReference || null;

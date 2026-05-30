@@ -1,8 +1,10 @@
-import { Controller, Patch, Param, Body, Req, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Patch, Post, Param, Body, Req, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PayInfractionDto } from './dto/pay-infraction.dto';
+import { PayMultipleInfractionsDto } from './dto/pay-multiple-infractions.dto';
 import { PayInfractionCommand } from '@infraction/application/commands/v1/pay-infraction/pay-infraction.command';
+import { PayMultipleInfractionsCommand } from '@infraction/application/commands/v1/pay-multiple-infractions/pay-multiple-infractions.command';
 import { matchResult } from '@common/http/match-result';
 import { Audit, AuditContext } from '@shared/infrastructure/decorators/audit-context.decorator';
 import { Roles } from '@shared/infrastructure/decorators/roles.decorator';
@@ -30,6 +32,30 @@ export class PayInfractionController {
         req.user.tenantId,
         req.user.sub,
         dto.paymentId,
+        audit.ip,
+        audit.userAgent,
+      ),
+    );
+
+    return matchResult(result);
+  }
+
+  @Post('pay-multiple')
+  @Roles('ADMIN', 'OPERATOR')
+  @UseGuards(RolesGuard)
+  @ApiOperation({ summary: 'Registrar el pago consolidado de múltiples infracciones' })
+  async payMultiple(
+    @Body() dto: PayMultipleInfractionsDto,
+    @Req() req: any,
+    @Audit() audit: AuditContext,
+  ) {
+    const result = await this.commandBus.execute(
+      new PayMultipleInfractionsCommand(
+        dto.infractionIds,
+        dto.paymentMethod,
+        dto.operationReference,
+        req.user.tenantId,
+        req.user.sub,
         audit.ip,
         audit.userAgent,
       ),

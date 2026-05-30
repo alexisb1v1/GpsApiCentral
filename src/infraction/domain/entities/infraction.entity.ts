@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Jo
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
+import { PaymentEntity } from '../../../payment/domain/entities/payment.entity';
 
 export enum InfractionType {
   PIRATERIA = 'PIRATERIA',
@@ -34,6 +35,9 @@ export class InfractionEntity {
 
   @Column({ name: 'round_id', type: 'uuid', nullable: true })
   roundId: string | null;
+
+  @Column({ name: 'payment_id', type: 'uuid', nullable: true })
+  paymentId: string | null;
 
   @Column({
     type: 'enum',
@@ -71,4 +75,8 @@ export class InfractionEntity {
   @ManyToOne(() => DailyRoundEntity, { nullable: true })
   @JoinColumn({ name: 'round_id' })
   round: DailyRoundEntity | null;
+
+  @ManyToOne(() => PaymentEntity, { nullable: true })
+  @JoinColumn({ name: 'payment_id' })
+  payment: PaymentEntity | null;
 }

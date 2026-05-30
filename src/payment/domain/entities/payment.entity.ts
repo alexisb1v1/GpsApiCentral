@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
-import { InfractionEntity } from '@infraction/domain/entities/infraction.entity';
 import { UserEntity } from '@user/domain/entities/user.entity';
 
 @Entity('payments')
@@ -14,9 +13,6 @@ export class PaymentEntity {
 
   @Column({ name: 'daily_ticket_id', type: 'uuid', nullable: true })
   dailyTicketId: string | null;
-
-  @Column({ name: 'infraction_id', type: 'uuid', nullable: true })
-  infractionId: string | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: number;
@@ -44,10 +40,6 @@ export class PaymentEntity {
   @ManyToOne(() => DailyTicketEntity, { nullable: true })
   @JoinColumn({ name: 'daily_ticket_id' })
   dailyTicket: DailyTicketEntity | null;
-
-  @ManyToOne(() => InfractionEntity, { nullable: true })
-  @JoinColumn({ name: 'infraction_id' })
-  infraction: InfractionEntity | null;
 
   @ManyToOne(() => UserEntity)
   @JoinColumn({ name: 'registered_by' })

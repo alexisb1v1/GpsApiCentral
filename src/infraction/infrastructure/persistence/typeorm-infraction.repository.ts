@@ -50,7 +50,8 @@ export class TypeOrmInfractionRepository implements InfractionRepository {
   }): Promise<Result<InfractionEntity[], AppError>> {
     try {
       const queryBuilder = this.repository.createQueryBuilder('infraction')
-        .leftJoinAndSelect('infraction.vehicle', 'vehicle');
+        .leftJoinAndSelect('infraction.vehicle', 'vehicle')
+        .leftJoinAndSelect('infraction.payment', 'payment');
 
       if (filters.tenantId) {
         queryBuilder.andWhere('infraction.tenantId = :tenantId', { tenantId: filters.tenantId });
