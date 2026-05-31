@@ -22,7 +22,7 @@ const QueryHandlers = [GetDailyTicketsHandler];
   imports: [
     CqrsModule,
     TypeOrmModule.forFeature([DailyTicketEntity, DailyRoundEntity]),
-    VehicleModule,
+    forwardRef(() => VehicleModule),
     PaymentModule,
     DriverModule,
     RouteModule,

@@ -7,6 +7,7 @@ import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
+import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
 
 @CommandHandler(CreateVehicleCommand)
 export class CreateVehicleHandler implements ICommandHandler<CreateVehicleCommand> {
@@ -16,6 +17,7 @@ export class CreateVehicleHandler implements ICommandHandler<CreateVehicleComman
     @Inject('ITraccarProvider')
     private readonly traccarProvider: ITraccarProvider,
     private readonly auditService: AuditService,
+    private readonly vehicleTenantCache: VehicleTenantCache,
   ) {}
 
   async execute(command: CreateVehicleCommand): Promise<Result<VehicleEntity, AppError>> {
@@ -69,6 +71,19 @@ export class CreateVehicleHandler implements ICommandHandler<CreateVehicleComman
     const saveResult = await this.vehicleRepository.save(newVehicle);
 
     if (saveResult.isOk()) {
+      if (traccarId) {
+        this.vehicleTenantCache.setVehicleState(traccarId, {
+          vehicleId: saveResult.value.id,
+          tenantId: saveResult.value.tenantId,
+          dailyTicketId: null,
+          plate: saveResult.value.plate,
+          driverName: 'No asignado',
+          driverId: null,
+          routeId: null,
+          direction: null,
+        });
+      }
+
       this.auditService.createLog({
         tenantId: command.tenantId,
         userId: command.userId,

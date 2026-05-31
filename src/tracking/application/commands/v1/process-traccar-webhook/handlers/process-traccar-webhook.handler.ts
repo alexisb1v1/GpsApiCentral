@@ -160,6 +160,9 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
       const infraction = new InfractionEntity();
       infraction.tenantId = tenantId;
       infraction.vehicleId = ticket.vehicleId;
+      infraction.userId = ticket.driverId || '';
+      infraction.dailyTicketId = ticket.id;
+      infraction.roundId = roundId;
       infraction.type = InfractionType.RETRASO_RUTA;
       infraction.amount = 10.00;
       infraction.status = InfractionStatus.PENDING;

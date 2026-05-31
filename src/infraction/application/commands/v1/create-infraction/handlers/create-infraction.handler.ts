@@ -1,10 +1,14 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateInfractionCommand } from '../create-infraction.command';
 import { InfractionRepository } from '@infraction/domain/repositories/infraction.repository';
 import { InfractionEntity, InfractionStatus } from '@infraction/domain/entities/infraction.entity';
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
+import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 
@@ -15,6 +19,10 @@ export class CreateInfractionHandler implements ICommandHandler<CreateInfraction
     private readonly infractionRepository: InfractionRepository,
     @Inject('VehicleRepository')
     private readonly vehicleRepository: VehicleRepository,
+    @InjectRepository(DailyTicketEntity)
+    private readonly ticketRepository: Repository<DailyTicketEntity>,
+    @InjectRepository(DailyRoundEntity)
+    private readonly roundRepository: Repository<DailyRoundEntity>,
     private readonly auditService: AuditService,
   ) {}
 
@@ -28,11 +36,61 @@ export class CreateInfractionHandler implements ICommandHandler<CreateInfraction
       return err('FORBIDDEN' as any); // O un error más específico de dominio
     }
 
-    // 2. Crear la entidad
+    // 2. Buscar ticket diario activo de hoy para este vehículo y su respectiva vuelta (Round)
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const todayStr = formatter.format(new Date()); // Formato YYYY-MM-DD
+
+    const ticket = await this.ticketRepository.findOne({
+      where: {
+        vehicleId: command.vehicleId,
+        workDate: todayStr as any,
+        status: 'ACTIVE' as any,
+      },
+    });
+
+    let dailyTicketId: string | null = null;
+    let roundId: string | null = null;
+
+    if (ticket) {
+      dailyTicketId = ticket.id;
+
+      // Buscar vuelta activa (IN_PROGRESS)
+      const activeRound = await this.roundRepository.findOne({
+        where: {
+          dailyTicketId: ticket.id,
+          status: 'IN_PROGRESS' as any,
+        },
+        order: { roundNumber: 'DESC' },
+      });
+
+      if (activeRound) {
+        roundId = activeRound.id;
+      } else {
+        // Si no hay vuelta activa (IN_PROGRESS), obtener la última vuelta creada
+        const lastRound = await this.roundRepository.findOne({
+          where: { dailyTicketId: ticket.id },
+          order: { roundNumber: 'DESC' },
+        });
+        if (lastRound) {
+          roundId = lastRound.id;
+        }
+      }
+    }
+
+    // 3. Crear la entidad
     const infraction = new InfractionEntity();
     infraction.tenantId = command.tenantId;
     infraction.vehicleId = command.vehicleId;
     infraction.userId = command.userId;
+    if (dailyTicketId) {
+      infraction.dailyTicketId = dailyTicketId;
+    }
+    infraction.roundId = roundId;
     infraction.type = command.type;
     infraction.amount = command.amount;
     infraction.status = InfractionStatus.PENDING;

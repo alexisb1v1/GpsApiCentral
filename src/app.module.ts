@@ -18,6 +18,7 @@ import { StorageModule } from '@shared/infrastructure/storage/storage.module';
 import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { PaymentModule } from './payment/infrastructure/nestjs/payment.module';
+import { DashboardModule } from './dashboard/infrastructure/nestjs/dashboard.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { PaymentModule } from './payment/infrastructure/nestjs/payment.module';
     StorageModule,
     TraccarModule,
     MonitoringModule,
+    DashboardModule,
     // Aquí se importarán los módulos de dominio (ej. GpsModule)
   ],
   controllers: [HealthCheckController],

@@ -10,6 +10,7 @@ import { IsUUID, IsEnum, IsString, IsNotEmpty, IsNumber, IsOptional } from 'clas
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 import { InfractionEntity, InfractionStatus, InfractionType } from '@infraction/domain/entities/infraction.entity';
 import { Public } from '@shared/infrastructure/decorators/public.decorator';
 
@@ -53,6 +54,8 @@ export class CreateInfractionController {
     private readonly ticketTypeOrmRepository: Repository<DailyTicketEntity>,
     @InjectRepository(InfractionEntity)
     private readonly infractionTypeOrmRepository: Repository<InfractionEntity>,
+    @InjectRepository(DailyRoundEntity)
+    private readonly roundTypeOrmRepository: Repository<DailyRoundEntity>,
   ) {}
 
   @Post('create')
@@ -106,12 +109,36 @@ export class CreateInfractionController {
       );
     }
 
+    // Buscar vuelta activa (IN_PROGRESS)
+    const activeRound = await this.roundTypeOrmRepository.findOne({
+      where: {
+        dailyTicketId: ticket.id,
+        status: 'IN_PROGRESS' as any,
+      },
+      order: { roundNumber: 'DESC' },
+    });
+
+    let roundId: string | null = null;
+    if (activeRound) {
+      roundId = activeRound.id;
+    } else {
+      // Si no hay vuelta activa (IN_PROGRESS), obtener la última vuelta creada
+      const lastRound = await this.roundTypeOrmRepository.findOne({
+        where: { dailyTicketId: ticket.id },
+        order: { roundNumber: 'DESC' },
+      });
+      if (lastRound) {
+        roundId = lastRound.id;
+      }
+    }
+
     // 3. Crear y guardar la infracción real en la base de datos
     const infraction = new InfractionEntity();
     infraction.tenantId = ticket.tenantId;
     infraction.vehicleId = ticket.vehicleId;
     infraction.userId = dto.driverId;
     infraction.dailyTicketId = ticket.id;
+    infraction.roundId = roundId;
     infraction.type = InfractionType.RETRASO_RUTA;
     infraction.amount = dto.amount || 20.00;
     infraction.description = dto.message;

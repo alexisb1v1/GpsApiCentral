@@ -7,6 +7,7 @@ import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
+import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
 
 @CommandHandler(UpdateVehicleCommand)
 export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleCommand> {
@@ -16,6 +17,7 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
     @Inject('ITraccarProvider')
     private readonly traccarProvider: ITraccarProvider,
     private readonly auditService: AuditService,
+    private readonly vehicleTenantCache: VehicleTenantCache,
   ) {}
 
   async execute(command: UpdateVehicleCommand): Promise<Result<VehicleEntity, AppError>> {
@@ -78,6 +80,40 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
     const saveResult = await this.vehicleRepository.save(vehicle);
 
     if (saveResult.isOk()) {
+      // Si el traccarId anterior era diferente, remover la clave vieja de la caché
+      if (oldValues.traccarId && oldValues.traccarId !== vehicle.traccarId) {
+        this.vehicleTenantCache.removeVehicleState(oldValues.traccarId, oldValues.id);
+      }
+
+      if (vehicle.traccarId) {
+        // Preservar estado del ticket o chofer si ya existía en la caché
+        let currentTicketId: string | null = null;
+        let currentDriverName = 'No asignado';
+        let currentDriverId: string | null = null;
+        let currentRouteId: string | null = null;
+        let currentDirection: 'IDA' | 'VUELTA' | null = null;
+
+        const existingState = this.vehicleTenantCache.getVehicleState(vehicle.traccarId);
+        if (existingState) {
+          currentTicketId = existingState.dailyTicketId;
+          currentDriverName = existingState.driverName || 'No asignado';
+          currentDriverId = existingState.driverId;
+          currentRouteId = existingState.routeId;
+          currentDirection = existingState.direction;
+        }
+
+        this.vehicleTenantCache.setVehicleState(vehicle.traccarId, {
+          vehicleId: vehicle.id,
+          tenantId: vehicle.tenantId,
+          dailyTicketId: currentTicketId,
+          plate: vehicle.plate,
+          driverName: currentDriverName,
+          driverId: currentDriverId,
+          routeId: currentRouteId,
+          direction: currentDirection,
+        });
+      }
+
       this.auditService.createLog({
         tenantId: command.tenantId,
         userId: command.userId,

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
@@ -6,6 +6,7 @@ import { VehicleDocumentEntity } from '@vehicle/domain/entities/vehicle-document
 import { TypeOrmVehicleRepository } from '@vehicle/infrastructure/persistence/typeorm-vehicle.repository';
 import { TypeOrmVehicleDocumentRepository } from '@vehicle/infrastructure/persistence/typeorm-vehicle-document.repository';
 import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
+import { MonitoringModule } from '../../../monitoring/monitoring.module';
 
 // Commands
 import { CreateVehicleHandler } from '@vehicle/application/commands/v1/create-vehicle/handlers/create-vehicle.handler';
@@ -62,6 +63,7 @@ const Repositories = [
     TypeOrmModule.forFeature([VehicleEntity, VehicleDocumentEntity]),
     CqrsModule,
     TraccarModule,
+    forwardRef(() => MonitoringModule),
   ],
   controllers: [
     CreateVehicleController,

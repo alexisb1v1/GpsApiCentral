@@ -6,6 +6,7 @@ import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.reposito
 import { VehicleStatus } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
 
 @CommandHandler(DeleteVehicleCommand)
 export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleCommand> {
@@ -13,6 +14,7 @@ export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleComman
     @Inject('VehicleRepository')
     private readonly vehicleRepository: VehicleRepository,
     private readonly auditService: AuditService,
+    private readonly vehicleTenantCache: VehicleTenantCache,
   ) {}
 
   async execute(command: DeleteVehicleCommand): Promise<Result<void, AppError>> {
@@ -30,6 +32,10 @@ export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleComman
     const saveResult = await this.vehicleRepository.save(vehicle);
     
     if (saveResult.isOk()) {
+      if (vehicle.traccarId) {
+        this.vehicleTenantCache.removeVehicleState(vehicle.traccarId, vehicle.id);
+      }
+
       // 4. Registrar en auditoría
       this.auditService.createLog({
         tenantId: command.tenantId,

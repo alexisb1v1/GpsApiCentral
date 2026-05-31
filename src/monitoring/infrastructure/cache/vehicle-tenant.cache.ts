@@ -335,6 +335,17 @@ export class VehicleTenantCache implements OnModuleInit {
   }
 
   /**
+   * Elimina un vehículo de la caché (al darlo de baja o cambiar su IMEI en el sistema)
+   */
+  removeVehicleState(traccarDeviceId: number, vehicleId?: string): void {
+    this.cache.delete(traccarDeviceId);
+    if (vehicleId) {
+      this.vehicleIdToTraccarId.delete(vehicleId);
+    }
+    this.logger.log(`Vehículo de monitoreo removido de caché: Traccar ID ${traccarDeviceId}`);
+  }
+
+  /**
    * Valida si el día de hoy difiere del día en que se cargó la caché.
    * Si es así, realiza un auto-reinicio en segundo plano de manera asíncrona.
    */
