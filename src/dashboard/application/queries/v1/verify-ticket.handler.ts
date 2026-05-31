@@ -6,6 +6,7 @@ import { VerifyTicketQuery } from './verify-ticket.query';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { InfractionEntity } from '@infraction/domain/entities/infraction.entity';
 import { PaymentEntity } from '../../../../payment/domain/entities/payment.entity';
+import { TenantEntity } from '../../../../tenant/domain/entities/tenant.entity';
 
 @QueryHandler(VerifyTicketQuery)
 export class VerifyTicketHandler implements IQueryHandler<VerifyTicketQuery> {
@@ -16,12 +17,32 @@ export class VerifyTicketHandler implements IQueryHandler<VerifyTicketQuery> {
     private readonly infractionRepository: Repository<InfractionEntity>,
     @InjectRepository(PaymentEntity)
     private readonly paymentRepository: Repository<PaymentEntity>,
+    @InjectRepository(TenantEntity)
+    private readonly tenantRepository: Repository<TenantEntity>,
   ) {}
 
   async execute(query: VerifyTicketQuery): Promise<any> {
-    const { code } = query;
+    const { code, subdomain } = query;
     if (!code) {
       return { success: false, message: 'Código de ticket no proporcionado.' };
+    }
+
+    let targetTenantId: string | null = null;
+    if (subdomain) {
+      const cleanSub = subdomain.trim().toLowerCase();
+      // Permitir consultas libres si es el dominio general de administración
+      if (cleanSub !== 'gpscentral' && cleanSub !== 'localhost') {
+        const tenantObj = await this.tenantRepository.findOne({
+          where: { subdomain: cleanSub }
+        });
+        if (!tenantObj) {
+          return {
+            success: false,
+            message: `La empresa de transporte con subdominio "${subdomain}" no existe en el sistema SaaS.`
+          };
+        }
+        targetTenantId = tenantObj.id;
+      }
     }
 
     const cleanCode = code.trim().toUpperCase();
@@ -37,6 +58,14 @@ export class VerifyTicketHandler implements IQueryHandler<VerifyTicketQuery> {
     });
 
     if (ticket) {
+      // Validar aislamiento de tenant para verificación SaaS
+      if (targetTenantId && ticket.tenantId !== targetTenantId) {
+        return {
+          success: false,
+          message: `El ticket "${ticket.ticketNumber}" no pertenece a la empresa de transporte activa.`
+        };
+      }
+
       return {
         success: true,
         type: 'SALIDA',
@@ -70,6 +99,14 @@ export class VerifyTicketHandler implements IQueryHandler<VerifyTicketQuery> {
     });
 
     if (payment) {
+      // Validar aislamiento de tenant para verificación SaaS
+      if (targetTenantId && payment.tenantId !== targetTenantId) {
+        return {
+          success: false,
+          message: `El comprobante de pago "${payment.paymentNumber}" no pertenece a la empresa de transporte activa.`
+        };
+      }
+
       // Buscar las infracciones asociadas a este cobro de caja
       const infractions = await this.infractionRepository.find({
         where: { paymentId: payment.id },

@@ -1,5 +1,5 @@
 /* src/dashboard/interfaces/http/v1/get-dashboard-metrics.controller.ts */
-import { Controller, Get, Req, UseGuards, Param } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards, Param, Query } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { GetDashboardMetricsQuery } from '../../../application/queries/v1/get-dashboard-metrics.query';
@@ -31,9 +31,12 @@ export class GetDashboardMetricsController {
   @Get('verify/:code')
   @ApiOperation({ summary: 'Verificar públicamente un ticket de salida o abono por su correlativo' })
   @ApiResponse({ status: 200, description: 'Verificación de ticket cargada con éxito' })
-  async verifyTicket(@Param('code') code: string) {
+  async verifyTicket(
+    @Param('code') code: string,
+    @Query('subdomain') subdomain?: string,
+  ) {
     const result = await this.queryBus.execute(
-      new VerifyTicketQuery(code)
+      new VerifyTicketQuery(code, subdomain)
     );
     return result;
   }
