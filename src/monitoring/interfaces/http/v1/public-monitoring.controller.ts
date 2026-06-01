@@ -112,17 +112,33 @@ export class PublicMonitoringController {
     };
   }
 
-  /**
-   * Helper robusto para validar cabeceras HTTP de origen contra la base de datos
-   */
   private validateRequestOrigin(tenant: TenantEntity, request: Request): void {
+    const referer = request.headers['referer'] as string | undefined;
+    const origin = request.headers['origin'] as string | undefined;
+
+    // Permitir acceso de forma nativa si proviene del propio subdominio del tenant o de la plataforma central
+    // (Ya que la llamada fetch de React dentro del iframe se ejecuta en el contexto del dominio del iframe)
+    const selfDomainPattern = `${tenant.subdomain}.centralafbv.com`;
+    const checkSelfMatch = (urlStr: string | undefined): boolean => {
+      if (!urlStr) return false;
+      try {
+        const parsed = new URL(urlStr);
+        const host = parsed.hostname.toLowerCase();
+        return host.includes('centralafbv.com') || host.includes(selfDomainPattern);
+      } catch {
+        const lowerStr = urlStr.toLowerCase();
+        return lowerStr.includes('centralafbv.com');
+      }
+    };
+
+    if (checkSelfMatch(origin) || checkSelfMatch(referer)) {
+      return; // Autorizado de forma nativa
+    }
+
     // Si no hay dominios restringidos configurados en el tenant, permitir por defecto
     if (!tenant.allowedDomains || tenant.allowedDomains.trim() === '') {
       return;
     }
-
-    const referer = request.headers['referer'] as string | undefined;
-    const origin = request.headers['origin'] as string | undefined;
 
     // Dominios autorizados en la BD
     const allowedList = tenant.allowedDomains
