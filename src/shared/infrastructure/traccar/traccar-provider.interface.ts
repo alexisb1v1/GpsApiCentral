@@ -74,6 +74,21 @@ export interface ITraccarProvider {
    * @param to - Fecha de fin (UTC)
    */
   getDevicePositions(traccarDeviceId: number, from: Date, to: Date): Promise<Result<any[], Error>>;
+
+  /**
+   * Actualiza un dispositivo en el servidor de Traccar (ej: cambiar el groupId o el nombre).
+   */
+  updateDevice(id: number, device: TraccarDevice): Promise<Result<TraccarDevice, Error>>;
+
+  /**
+   * Elimina físicamente un dispositivo en Traccar por su ID interno.
+   */
+  deleteDevice(id: number): Promise<Result<void, Error>>;
+
+  /**
+   * Elimina un grupo de Traccar por su ID.
+   */
+  deleteGroup(id: number): Promise<Result<void, Error>>;
 }
 
 

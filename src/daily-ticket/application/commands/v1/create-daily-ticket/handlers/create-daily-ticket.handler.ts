@@ -1,6 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Result, ok, err } from 'neverthrow';
-import { Inject } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CreateDailyTicketCommand } from '../create-daily-ticket.command';
 import { DailyTicketRepository } from '@daily-ticket/domain/repositories/daily-ticket.repository';
@@ -16,9 +16,12 @@ import { DocumentTypeConstants } from '@shared/domain/constants/document-type.co
 import { DriverInfoRepository } from '@driver/domain/repositories/driver-info.repository';
 import { RouteRepository } from '../../../../../../route/domain/repositories/route.repository';
 import { UserRepository } from '@user/domain/repositories/user.repository';
+import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 
 @CommandHandler(CreateDailyTicketCommand)
 export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTicketCommand> {
+  private readonly logger = new Logger(CreateDailyTicketHandler.name);
+
   constructor(
     private readonly dataSource: DataSource,
     @Inject('DailyTicketRepository')
@@ -31,6 +34,8 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
     private readonly routeRepository: RouteRepository,
     @Inject('UserRepository')
     private readonly userRepository: UserRepository,
+    @Inject('ITraccarProvider')
+    private readonly traccarProvider: ITraccarProvider,
     private readonly auditService: AuditService,
     private readonly vehicleTenantCache: VehicleTenantCache,
   ) { }
@@ -64,12 +69,13 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
     }
 
     // 1.2 Validar que la ruta opcional pertenece al mismo tenant
+    let route: any = null;
     if (command.routeId) {
       const routeResult = await this.routeRepository.findById(command.routeId);
       if (routeResult.isErr()) {
         return err('ROUTE_NOT_FOUND');
       }
-      const route = routeResult.value;
+      route = routeResult.value;
       if (route.tenantId !== command.tenantId) {
         return err('ROUTE_TENANT_MISMATCH');
       }
@@ -195,6 +201,23 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
 
       // H. Operaciones posteriores no bloqueantes
       this.vehicleTenantCache.setDailyTicketId(savedTicket.vehicleId, savedTicket.id);
+
+      // Sincronizar en Traccar: Vincular el vehículo al grupo de la ruta
+      if (vehicle.traccarId && route && route.traccarGroupId) {
+        this.traccarProvider.updateDevice(vehicle.traccarId, {
+          name: vehicle.plate,
+          uniqueId: vehicle.traccarDeviceId || '',
+          groupId: route.traccarGroupId
+        }).then(res => {
+          if (res.isErr()) {
+            this.logger.error(`Error al vincular vehículo ${vehicle.plate} (ID Traccar: ${vehicle.traccarId}) al grupo Traccar ${route.traccarGroupId}: ${res.error.message}`);
+          } else {
+            this.logger.log(`Vehículo ${vehicle.plate} (ID Traccar: ${vehicle.traccarId}) vinculado al grupo de ruta ${route.traccarGroupId} con éxito.`);
+          }
+        }).catch(errVal => {
+          this.logger.error(`Excepción al vincular vehículo ${vehicle.plate} al grupo Traccar ${route.traccarGroupId}: ${errVal.message}`);
+        });
+      }
 
       this.auditService.createLog({
         tenantId: command.tenantId,

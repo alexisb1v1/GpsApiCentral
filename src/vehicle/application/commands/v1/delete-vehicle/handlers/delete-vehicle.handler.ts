@@ -7,12 +7,15 @@ import { VehicleStatus } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 
 @CommandHandler(DeleteVehicleCommand)
 export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleCommand> {
   constructor(
     @Inject('VehicleRepository')
     private readonly vehicleRepository: VehicleRepository,
+    @Inject('ITraccarProvider')
+    private readonly traccarProvider: ITraccarProvider,
     private readonly auditService: AuditService,
     private readonly vehicleTenantCache: VehicleTenantCache,
   ) {}
@@ -34,6 +37,8 @@ export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleComman
     if (saveResult.isOk()) {
       if (vehicle.traccarId) {
         this.vehicleTenantCache.removeVehicleState(vehicle.traccarId, vehicle.id);
+        // Dar de baja físicamente en Traccar
+        await this.traccarProvider.deleteDevice(vehicle.traccarId);
       }
 
       // 4. Registrar en auditoría

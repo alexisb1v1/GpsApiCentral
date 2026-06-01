@@ -262,4 +262,81 @@ export class TraccarProvider implements ITraccarProvider {
       return err(new Error(`Excepción en conector Traccar: ${error.message}`));
     }
   }
+
+  async updateDevice(id: number, device: TraccarDevice): Promise<Result<TraccarDevice, Error>> {
+    const url = `${this.baseUrl}/api/devices/${id}`;
+    this.logger.log(`Actualizando dispositivo en Traccar. ID: ${id}, Nombre: "${device.name}" (uniqueId: ${device.uniqueId})`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ ...device, id }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al actualizar dispositivo ${id}: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      const data = (await response.json()) as TraccarDevice;
+      this.logger.log(`Dispositivo ID ${id} actualizado con éxito en Traccar`);
+      return ok(data);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al actualizar dispositivo en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
+  async deleteDevice(id: number): Promise<Result<void, Error>> {
+    const url = `${this.baseUrl}/api/devices/${id}`;
+    this.logger.log(`Eliminando dispositivo de Traccar. ID: ${id}`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok && response.status !== 204) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al eliminar dispositivo ${id}: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      this.logger.log(`Dispositivo ID ${id} eliminado con éxito de Traccar`);
+      return ok(undefined);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al eliminar dispositivo en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
+  async deleteGroup(id: number): Promise<Result<void, Error>> {
+    const url = `${this.baseUrl}/api/groups/${id}`;
+    this.logger.log(`Eliminando grupo de Traccar. ID: ${id}`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok && response.status !== 204) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al eliminar grupo ${id}: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      this.logger.log(`Grupo ID ${id} eliminado con éxito de Traccar`);
+      return ok(undefined);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al eliminar grupo en Traccar: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
 }

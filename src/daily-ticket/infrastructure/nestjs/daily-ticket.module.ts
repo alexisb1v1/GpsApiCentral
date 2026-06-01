@@ -14,6 +14,7 @@ import { PaymentModule } from '../../../payment/infrastructure/nestjs/payment.mo
 import { DriverModule } from '@driver/infrastructure/nestjs/driver.module';
 import { RouteModule } from '../../../route/infrastructure/nestjs/route.module';
 import { UserModule } from '@user/infrastructure/nestjs/user.module';
+import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
 
 const CommandHandlers = [CreateDailyTicketHandler];
 const QueryHandlers = [GetDailyTicketsHandler];
@@ -28,6 +29,7 @@ const QueryHandlers = [GetDailyTicketsHandler];
     RouteModule,
     UserModule,
     forwardRef(() => MonitoringModule),
+    TraccarModule,
   ],
   controllers: [CreateDailyTicketController, GetDailyTicketsController],
   providers: [

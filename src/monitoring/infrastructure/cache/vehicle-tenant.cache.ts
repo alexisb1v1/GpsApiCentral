@@ -1,10 +1,11 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Subject } from 'rxjs';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 
 export interface CachedVehicleState {
   vehicleId: string;
@@ -42,6 +43,8 @@ export class VehicleTenantCache implements OnModuleInit {
     @InjectRepository(DailyTicketEntity)
     private readonly ticketRepository: Repository<DailyTicketEntity>,
     private readonly configService: ConfigService,
+    @Inject('ITraccarProvider')
+    private readonly traccarProvider: ITraccarProvider,
   ) {}
 
   async onModuleInit() {
@@ -398,6 +401,37 @@ export class VehicleTenantCache implements OnModuleInit {
    */
   async resetCache(): Promise<void> {
     this.logger.log('[Cache] Forzando el reinicio completo de la caché de vehículos y tickets...');
+
+    // DESAFILIAR EN LOTE DE GRUPOS EN TRACCAR ANTES DE LIMPIAR LA MEMORIA
+    try {
+      const activeVehicles = Array.from(this.cache.entries())
+        .filter(([traccarId, state]) => state.dailyTicketId !== null)
+        .map(([traccarId, state]) => ({
+          traccarId,
+          plate: state.plate
+        }));
+
+      if (activeVehicles.length > 0) {
+        this.logger.log(`[Cache - Fin de Día] Desafiliando ${activeVehicles.length} vehículo(s) de sus grupos de ruta en Traccar...`);
+        const updatePromises = activeVehicles.map(async (v) => {
+          // Busquemos en base de datos el vehículo para obtener su uniqueId (traccarDeviceId) real
+          const vehicleObj = await this.vehicleRepository.findOne({ where: { traccarId: v.traccarId } });
+          if (vehicleObj && vehicleObj.traccarDeviceId) {
+            await this.traccarProvider.updateDevice(v.traccarId, {
+              name: vehicleObj.plate,
+              uniqueId: vehicleObj.traccarDeviceId,
+              groupId: 0 // 0 remueve el grupo en la API de Traccar
+            });
+          }
+        });
+        
+        await Promise.allSettled(updatePromises);
+        this.logger.log(`[Cache - Fin de Día] Desafiliación en lote completada con éxito.`);
+      }
+    } catch (err: any) {
+      this.logger.error(`[Cache - Fin de Día] Error al desafiliar vehículos en lote de Traccar: ${err.message}`);
+    }
+
     this.preloadPromise = null;
     await this.preloadCache();
   }

@@ -34,6 +34,46 @@ export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStops
       return err('UNAUTHORIZED');
     }
 
+    // Si la ruta se está desactivando (isActive === false)
+    if (command.isActive === false) {
+      // 1. Eliminar geocercas en Traccar para todos los paraderos asociados
+      if (route.stops && route.stops.length > 0) {
+        for (const stop of route.stops) {
+          if (stop.traccarGeofenceId) {
+            await this.traccarProvider.deleteGeofence(stop.traccarGeofenceId);
+          }
+        }
+      }
+      
+      // 2. Eliminar el grupo en Traccar
+      if (route.traccarGroupId && route.traccarGroupId !== 0) {
+        await this.traccarProvider.deleteGroup(route.traccarGroupId);
+        route.traccarGroupId = 0;
+      }
+
+      route.isActive = false;
+
+      // 3. Eliminar paraderos locales también
+      await this.routeRepository.deleteStopsByRoute(command.routeId);
+
+      const saveRouteResult = await this.routeRepository.save(route);
+      if (saveRouteResult.isErr()) return err(saveRouteResult.error);
+
+      // 4. Auditoría
+      this.auditService.createLog({
+        tenantId: command.tenantId,
+        userId: command.userId,
+        action: 'DEACTIVATE_ROUTE',
+        entityName: 'routes',
+        entityId: command.routeId,
+        newValues: route,
+        ipAddress: command.ipAddress,
+        userAgent: command.userAgent,
+      });
+
+      return ok(undefined);
+    }
+
     // Actualizar nombre, estado y coordenadas si se envían
     let routeUpdated = false;
     if (command.name !== undefined) {
@@ -53,8 +93,8 @@ export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStops
       routeUpdated = true;
     }
 
-    // Si traccarGroupId es nulo, undefined o 0, creamos el grupo en Traccar
-    if (!route.traccarGroupId || route.traccarGroupId === 0) {
+    // Si traccarGroupId es nulo, undefined o 0, creamos el grupo en Traccar (solo si la ruta está activa)
+    if (route.isActive && (!route.traccarGroupId || route.traccarGroupId === 0)) {
       const traccarResult = await this.traccarProvider.createGroup({
         name: route.name,
       });
