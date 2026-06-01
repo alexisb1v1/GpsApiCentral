@@ -38,6 +38,9 @@ export class TenantEntity {
   @Column({ name: 'tax_id', type: 'varchar', length: 20, nullable: true })
   taxId: string | null;
 
+  @Column({ name: 'allowed_domains', type: 'text', nullable: true })
+  allowedDomains: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

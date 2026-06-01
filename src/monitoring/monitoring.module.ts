@@ -5,6 +5,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { CqrsModule } from '@nestjs/cqrs';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
+import { RouteEntity } from '@route/domain/entities/route.entity';
 import { VehicleTenantCache } from './infrastructure/cache/vehicle-tenant.cache';
 import { TraccarSocketService } from './infrastructure/traccar/traccar-socket.service';
 import { MonitoringGateway } from './interfaces/ws/monitoring.gateway';
@@ -12,6 +14,7 @@ import { DriverGateway } from './interfaces/ws/driver.gateway';
 import { DailyTicketModule } from '@daily-ticket/infrastructure/nestjs/daily-ticket.module';
 import { DriverNotificationSentHandler } from './application/events/handlers/driver-notification-sent.handler';
 import { MonitoringCacheController } from './interfaces/http/v1/monitoring-cache.controller';
+import { PublicMonitoringController } from './interfaces/http/v1/public-monitoring.controller';
 import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
 
 @Module({
@@ -23,14 +26,15 @@ import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
       secret: process.env.JWT_SECRET || 'GpsCentralSecr3tK3y2026S4nju4n',
       signOptions: { expiresIn: '24h' },
     }),
-    // Habilitamos acceso directo a entidades para la precarga en memoria
-    TypeOrmModule.forFeature([VehicleEntity, DailyTicketEntity]),
+    // Habilitamos acceso directo a entidades para la precarga en memoria y consultas
+    TypeOrmModule.forFeature([VehicleEntity, DailyTicketEntity, TenantEntity, RouteEntity]),
     // Usamos forwardRef para resolver la dependencia circular con DailyTicketModule
     forwardRef(() => DailyTicketModule),
     TraccarModule,
   ],
   controllers: [
     MonitoringCacheController,
+    PublicMonitoringController,
   ],
   providers: [
     VehicleTenantCache,
