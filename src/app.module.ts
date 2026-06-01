@@ -19,6 +19,7 @@ import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
 import { PaymentModule } from './payment/infrastructure/nestjs/payment.module';
 import { DashboardModule } from './dashboard/infrastructure/nestjs/dashboard.module';
+import { AuditLogModule } from './audit-log/infrastructure/nestjs/audit-log.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { DashboardModule } from './dashboard/infrastructure/nestjs/dashboard.mod
     TraccarModule,
     MonitoringModule,
     DashboardModule,
+    AuditLogModule,
     // Aquí se importarán los módulos de dominio (ej. GpsModule)
   ],
   controllers: [HealthCheckController],
