@@ -69,6 +69,15 @@ export class VehicleTenantCache implements OnModuleInit {
     this.preloadPromise = (async () => {
       try {
         this.logger.log('Iniciando precarga de caché de vehículos y tickets diarios...');
+        
+        // Guardar posiciones GPS conocidas antes de limpiar para no perder la localización en caliente
+        const savedPositions = new Map<number, any>();
+        for (const [traccarId, state] of this.cache.entries()) {
+          if (state.lastPosition) {
+            savedPositions.set(traccarId, state.lastPosition);
+          }
+        }
+
         this.cache.clear();
         this.vehicleIdToTraccarId.clear();
 
@@ -197,6 +206,7 @@ export class VehicleTenantCache implements OnModuleInit {
             routeId: ticketData ? ticketData.routeId : null,
             routeName: ticketData && ticketData.routeId ? (routeMap.get(ticketData.routeId) || 'Sin Ruta') : 'Sin Ruta',
             direction: ticketData ? ticketData.direction : null,
+            lastPosition: savedPositions.get(traccarIdNum) || undefined,
           };
 
           this.cache.set(traccarIdNum, state);
