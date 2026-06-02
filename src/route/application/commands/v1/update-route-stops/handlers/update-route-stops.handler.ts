@@ -149,8 +149,8 @@ export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStops
         if (first.lat !== last.lat || first.lng !== last.lng) {
           coords.push(first);
         }
-        // WKT especifica Longitud (lng) primero y Latitud (lat) después
-        const wktPoints = coords.map(c => `${c.lng} ${c.lat}`).join(', ');
+        // Traccar espera Latitud (lat) primero y Longitud (lng) después para POLYGON
+        const wktPoints = coords.map(c => `${c.lat} ${c.lng}`).join(', ');
         area = `POLYGON ((${wktPoints}))`;
       } else {
         // Círculo con radio dinámico (dto.radius) o 5 metros por defecto
