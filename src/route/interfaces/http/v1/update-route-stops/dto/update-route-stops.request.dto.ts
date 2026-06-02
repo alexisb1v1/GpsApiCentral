@@ -37,6 +37,11 @@ export class RouteStopItemDto {
   @IsOptional()
   @IsArray()
   polygonCoordinates?: { lat: number; lng: number }[];
+
+  @ApiPropertyOptional({ example: 5, description: 'Radio del paradero en metros (si es circular)' })
+  @IsOptional()
+  @IsInt()
+  radius?: number;
 }
 
 export class UpdateRouteStopsRequestDto {

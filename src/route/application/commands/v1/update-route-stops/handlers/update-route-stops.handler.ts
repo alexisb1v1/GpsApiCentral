@@ -139,7 +139,24 @@ export class UpdateRouteStopsHandler implements ICommandHandler<UpdateRouteStops
         type = 'END';
       }
 
-      const area = `CIRCLE (${dto.lat} ${dto.lng}, 80)`;
+      // Determinar la geometría de la geocerca (WKT)
+      let area: string;
+      if (dto.polygonCoordinates && dto.polygonCoordinates.length >= 3) {
+        const coords = [...dto.polygonCoordinates];
+        // Asegurar que el polígono esté cerrado (primer punto idéntico al último)
+        const first = coords[0];
+        const last = coords[coords.length - 1];
+        if (first.lat !== last.lat || first.lng !== last.lng) {
+          coords.push(first);
+        }
+        // WKT especifica Longitud (lng) primero y Latitud (lat) después
+        const wktPoints = coords.map(c => `${c.lng} ${c.lat}`).join(', ');
+        area = `POLYGON ((${wktPoints}))`;
+      } else {
+        // Círculo con radio dinámico (dto.radius) o 5 metros por defecto
+        const radius = dto.radius || 5;
+        area = `CIRCLE (${dto.lat} ${dto.lng}, ${radius})`;
+      }
       let finalTraccarGeofenceId: number;
 
       if (dto.traccarGeofenceId) {
