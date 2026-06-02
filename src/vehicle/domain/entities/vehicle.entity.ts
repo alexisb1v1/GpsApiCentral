@@ -15,10 +15,10 @@ export class VehicleEntity {
   @Column({ type: 'varchar', length: 20 })
   plate: string;
 
-  @Column({ name: 'traccar_device_id', type: 'varchar', length: 50, unique: true, nullable: false })
+  @Column({ name: 'traccar_device_id', type: 'varchar', length: 50, unique: true, nullable: true })
   traccarDeviceId: string | null;
 
-  @Column({ name: 'traccar_id', type: 'int', unique: true, nullable: false })
+  @Column({ name: 'traccar_id', type: 'int', unique: true, nullable: true })
   traccarId: number | null;
 
 
