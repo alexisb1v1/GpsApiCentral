@@ -181,7 +181,7 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
       round.dailyTicketId = savedTicket.id;
       round.roundNumber = 1;
       round.direction = command.direction || 'IDA';
-      round.status = RoundsStatus.IN_PROGRESS;
+      round.status = RoundsStatus.PENDING;
 
       await queryRunner.manager.save(round);
 

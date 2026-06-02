@@ -10,6 +10,7 @@ import { VehicleModule } from '@vehicle/infrastructure/nestjs/vehicle.module';
 import { DailyTicketModule } from '@daily-ticket/infrastructure/nestjs/daily-ticket.module';
 import { RouteStopEntity } from '@route/domain/entities/route-stop.entity';
 import { InfractionEntity } from '@infraction/domain/entities/infraction.entity';
+import { MonitoringModule } from '../../../monitoring/monitoring.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { InfractionEntity } from '@infraction/domain/entities/infraction.entity'
     ]),
     VehicleModule,
     DailyTicketModule,
+    MonitoringModule,
   ],
   controllers: [TraccarWebhookController],
   providers: [ProcessTraccarWebhookHandler],

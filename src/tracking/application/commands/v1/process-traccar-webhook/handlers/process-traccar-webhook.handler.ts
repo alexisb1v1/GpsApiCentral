@@ -13,6 +13,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, In } from 'typeorm';
 import { RouteStopEntity } from '@route/domain/entities/route-stop.entity';
 import { InfractionEntity, InfractionType, InfractionStatus } from '@infraction/domain/entities/infraction.entity';
+import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { RoundsStatus } from '@daily-ticket/domain/entities/daily-round.entity';
 
 export enum GeofenceType {
   START = 'START',
@@ -38,6 +40,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     @InjectRepository(DailyRoundEntity)
     private readonly dailyRoundRepository: Repository<DailyRoundEntity>,
     private readonly eventBus: EventBus,
+    private readonly vehicleTenantCache: VehicleTenantCache,
   ) {}
 
   async execute(command: ProcessTraccarWebhookCommand): Promise<void> {
@@ -68,9 +71,13 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     if (ticketResult.isErr() || !ticketResult.value) return;
     const ticket = ticketResult.value;
 
-    // 3.1. Obtener el round (vuelta) activa actual de este ticket en Postgres
+    // 3.1. Obtener el round (vuelta) activa actual de este ticket en Postgres (puede estar PENDING o IN_PROGRESS)
     const activeRound = await this.dailyRoundRepository.findOne({
-      where: { dailyTicketId: ticket.id, status: 'IN_PROGRESS' as any }
+      where: [
+        { dailyTicketId: ticket.id, status: RoundsStatus.IN_PROGRESS },
+        { dailyTicketId: ticket.id, status: RoundsStatus.PENDING }
+      ],
+      order: { roundNumber: 'DESC' }
     });
     const roundId = activeRound ? activeRound.id : null;
 
@@ -110,8 +117,14 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     // 5. Regla de Negocio: Solo procesamos ENTRADAS para penalidades
     if (event.type !== 'geofenceEnter') return;
 
-    // 6. Si es paradero intermedio (CHECKPOINT), verificar retraso
-    if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId && roundId) {
+    // 5.1. Si es paradero final (END) y la vuelta activa estaba IN_PROGRESS, completarla y generar vuelta de retorno en PENDING
+    if (routeStop.type === GeofenceType.END && activeRound && activeRound.status === RoundsStatus.IN_PROGRESS) {
+      await this.autoCompleteRound(activeRound, ticket, vehicle.id, new Date(position.fixTime));
+      return;
+    }
+
+    // 6. Si es paradero intermedio (CHECKPOINT), verificar retraso (solo si la vuelta está activa IN_PROGRESS)
+    if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId && roundId && activeRound?.status === RoundsStatus.IN_PROGRESS) {
       await this.handleCheckpoint(
         ticket, 
         routeStop.traccarGeofenceId, 
@@ -191,5 +204,31 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
         );
       }
     }
+  }
+
+  private async autoCompleteRound(
+    activeRound: DailyRoundEntity,
+    ticket: DailyTicketEntity,
+    vehicleId: string,
+    arrivalTime: Date
+  ): Promise<void> {
+    // 1. Completar la vuelta actual
+    activeRound.status = RoundsStatus.COMPLETED;
+    activeRound.endTime = arrivalTime;
+    await this.dailyRoundRepository.save(activeRound);
+
+    // 2. Determinar la dirección de retorno
+    const nextDirection = activeRound.direction === 'IDA' ? 'VUELTA' : 'IDA';
+
+    // 3. Crear la siguiente vuelta en PENDING (sala de espera de retorno)
+    const nextRound = new DailyRoundEntity();
+    nextRound.dailyTicketId = ticket.id;
+    nextRound.roundNumber = activeRound.roundNumber + 1;
+    nextRound.direction = nextDirection;
+    nextRound.status = RoundsStatus.PENDING;
+    await this.dailyRoundRepository.save(nextRound);
+
+    // 4. Actualizar la caché satelital en caliente
+    await this.vehicleTenantCache.setDailyTicketId(vehicleId, ticket.id);
   }
 }

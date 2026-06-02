@@ -7,6 +7,8 @@ import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
 import { RouteEntity } from '@route/domain/entities/route.entity';
+import { DailyRoundEntity } from '../daily-ticket/domain/entities/daily-round.entity';
+import { InfractionEntity } from '../infraction/domain/entities/infraction.entity';
 import { VehicleTenantCache } from './infrastructure/cache/vehicle-tenant.cache';
 import { TraccarSocketService } from './infrastructure/traccar/traccar-socket.service';
 import { MonitoringGateway } from './interfaces/ws/monitoring.gateway';
@@ -27,7 +29,14 @@ import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
       signOptions: { expiresIn: '24h' },
     }),
     // Habilitamos acceso directo a entidades para la precarga en memoria y consultas
-    TypeOrmModule.forFeature([VehicleEntity, DailyTicketEntity, TenantEntity, RouteEntity]),
+    TypeOrmModule.forFeature([
+      VehicleEntity, 
+      DailyTicketEntity, 
+      TenantEntity, 
+      RouteEntity,
+      DailyRoundEntity,
+      InfractionEntity
+    ]),
     // Usamos forwardRef para resolver la dependencia circular con DailyTicketModule
     forwardRef(() => DailyTicketModule),
     TraccarModule,

@@ -7,6 +7,8 @@ import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
 import { RouteEntity } from '@route/domain/entities/route.entity';
+import { DailyRoundEntity, RoundsStatus } from '../../../daily-ticket/domain/entities/daily-round.entity';
+import { InfractionEntity, InfractionStatus } from '../../../infraction/domain/entities/infraction.entity';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 
 export interface CachedVehicleState {
@@ -21,6 +23,9 @@ export interface CachedVehicleState {
   routeName?: string; // Opcional, para el visor legible
   direction: 'IDA' | 'VUELTA' | null; // Dirección activa de la ruta
   lastPosition?: any; // Última posición conocida reportada por Traccar
+  roundId?: string | null;
+  roundStatus?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null;
+  hasPendingInfractions?: boolean;
 }
 
 @Injectable()
@@ -50,6 +55,10 @@ export class VehicleTenantCache implements OnModuleInit {
     private readonly tenantRepository: Repository<TenantEntity>,
     @InjectRepository(RouteEntity)
     private readonly routeRepository: Repository<RouteEntity>,
+    @InjectRepository(DailyRoundEntity)
+    private readonly roundRepository: Repository<DailyRoundEntity>,
+    @InjectRepository(InfractionEntity)
+    private readonly infractionRepository: Repository<InfractionEntity>,
     private readonly configService: ConfigService,
     @Inject('ITraccarProvider')
     private readonly traccarProvider: ITraccarProvider,
@@ -114,6 +123,15 @@ export class VehicleTenantCache implements OnModuleInit {
           relations: ['driver', 'rounds'],
         });
 
+        // Obtener infracciones pendientes de la base de datos para mapeo rápido
+        const pendingInfractions = await this.infractionRepository.find({
+          where: { status: InfractionStatus.PENDING }
+        });
+        const pendingInfractionTicketIds = new Set<string>();
+        for (const inf of pendingInfractions) {
+          pendingInfractionTicketIds.add(inf.dailyTicketId);
+        }
+
         // Mapear los tickets activos por vehicleId para búsqueda rápida en memoria
         const activeTicketsByVehicle = new Map<string, { 
           ticketId: string; 
@@ -121,19 +139,38 @@ export class VehicleTenantCache implements OnModuleInit {
           driverId: string | null;
           routeId: string | null;
           direction: 'IDA' | 'VUELTA' | null;
+          roundId: string | null;
+          roundStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null;
+          hasPendingInfractions: boolean;
         }>(); 
         for (const ticket of activeTickets) {
           let direction: 'IDA' | 'VUELTA' | null = 'IDA';
+          let roundId: string | null = null;
+          let roundStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null = null;
+
           if (ticket.rounds && ticket.rounds.length > 0) {
-            const activeRound = ticket.rounds.find(r => r.status === 'IN_PROGRESS') || ticket.rounds[ticket.rounds.length - 1];
-            direction = activeRound ? (activeRound.direction as any) : 'IDA';
+            const activeRound = ticket.rounds.find(r => r.status === RoundsStatus.IN_PROGRESS)
+              || ticket.rounds.find(r => r.status === RoundsStatus.PENDING)
+              || ticket.rounds[ticket.rounds.length - 1];
+            
+            if (activeRound) {
+              direction = activeRound.direction as any;
+              roundId = activeRound.id;
+              roundStatus = activeRound.status as any;
+            }
           }
+
+          const hasPendingInfractions = pendingInfractionTicketIds.has(ticket.id);
+
           activeTicketsByVehicle.set(ticket.vehicleId, {
             ticketId: ticket.id,
             driverName: ticket.driver ? ticket.driver.name : 'No asignado',
             driverId: ticket.driverId || null,
             routeId: ticket.routeId || null,
             direction: direction,
+            roundId: roundId,
+            roundStatus: roundStatus,
+            hasPendingInfractions: hasPendingInfractions,
           });
         }
 
@@ -207,6 +244,9 @@ export class VehicleTenantCache implements OnModuleInit {
             routeName: ticketData && ticketData.routeId ? (routeMap.get(ticketData.routeId) || 'Sin Ruta') : 'Sin Ruta',
             direction: ticketData ? ticketData.direction : null,
             lastPosition: savedPositions.get(traccarIdNum) || undefined,
+            roundId: ticketData ? ticketData.roundId : null,
+            roundStatus: ticketData ? ticketData.roundStatus : null,
+            hasPendingInfractions: ticketData ? ticketData.hasPendingInfractions : false,
           };
 
           this.cache.set(traccarIdNum, state);
@@ -272,6 +312,9 @@ export class VehicleTenantCache implements OnModuleInit {
           direction: state.direction,
           dailyTicketId: state.dailyTicketId,
           hasActiveTicket: !!state.dailyTicketId,
+          roundId: state.roundId,
+          roundStatus: state.roundStatus,
+          hasPendingInfractions: state.hasPendingInfractions,
         });
       }
     }
@@ -297,6 +340,9 @@ export class VehicleTenantCache implements OnModuleInit {
           direction: state.direction,
           dailyTicketId: state.dailyTicketId,
           hasActiveTicket: !!state.dailyTicketId,
+          roundId: state.roundId,
+          roundStatus: state.roundStatus,
+          hasPendingInfractions: state.hasPendingInfractions,
         };
       }
     }
@@ -324,6 +370,10 @@ export class VehicleTenantCache implements OnModuleInit {
       let routeId: string | null = null;
       let routeName = 'Sin Ruta';
       let direction: 'IDA' | 'VUELTA' | null = null;
+      let roundId: string | null = null;
+      let roundStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null = null;
+      let hasPendingInfractions = false;
+
       if (dailyTicketId) {
         try {
           const ticket = await this.ticketRepository.findOne({
@@ -341,14 +391,25 @@ export class VehicleTenantCache implements OnModuleInit {
             }
             
             if (ticket.rounds && ticket.rounds.length > 0) {
-              const activeRound = ticket.rounds.find(r => r.status === 'IN_PROGRESS') || ticket.rounds[ticket.rounds.length - 1];
-              direction = activeRound ? (activeRound.direction as any) : 'IDA';
+              const activeRound = ticket.rounds.find(r => r.status === RoundsStatus.IN_PROGRESS)
+                || ticket.rounds.find(r => r.status === RoundsStatus.PENDING)
+                || ticket.rounds[ticket.rounds.length - 1];
+              if (activeRound) {
+                direction = activeRound.direction as any;
+                roundId = activeRound.id;
+                roundStatus = activeRound.status as any;
+              }
             } else {
               direction = 'IDA';
             }
+
+            const pendingCount = await this.infractionRepository.count({
+              where: { dailyTicketId, status: InfractionStatus.PENDING }
+            });
+            hasPendingInfractions = pendingCount > 0;
           }
         } catch (error: any) {
-          this.logger.error(`Error al obtener chofer y ruta para ticket en caliente: ${error.message}`);
+          this.logger.error(`Error al obtener chofer, ruta y multas para ticket en caliente: ${error.message}`);
         }
       }
       
@@ -357,8 +418,12 @@ export class VehicleTenantCache implements OnModuleInit {
       currentState.routeId = routeId;
       currentState.routeName = routeName;
       currentState.direction = direction;
+      currentState.roundId = roundId;
+      currentState.roundStatus = roundStatus;
+      currentState.hasPendingInfractions = hasPendingInfractions;
+
       this.cache.set(traccarId, currentState);
-      this.logger.log(`Caché actualizada en caliente: Vehículo ID ${vehicleId} -> Ticket ID ${dailyTicketId}, Chofer: ${driverName} (ID: ${driverId}), Ruta: ${routeId}, Dirección: ${direction}`);
+      this.logger.log(`Caché actualizada en caliente: Vehículo ID ${vehicleId} -> Ticket ID ${dailyTicketId}, Chofer: ${driverName} (ID: ${driverId}), Ruta: ${routeId}, Dirección: ${direction}, Vuelta: ${roundId} (${roundStatus}), Multas: ${hasPendingInfractions}`);
       
       // Notificar reactivamente a los suscriptores (WebSockets)
       this.cacheUpdates$.next({ vehicleId, state: currentState });

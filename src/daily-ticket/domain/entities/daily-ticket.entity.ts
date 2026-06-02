@@ -7,6 +7,7 @@ import { DailyRoundEntity } from './daily-round.entity';
 export enum TicketStatus {
   ACTIVE = 'ACTIVE',
   VOIDED = 'VOIDED',
+  CLOSED = 'CLOSED',
 }
 
 @Entity('daily_tickets')
