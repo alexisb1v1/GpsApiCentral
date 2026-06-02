@@ -18,7 +18,7 @@ export interface TraccarGroup {
 export interface TraccarDevice {
   id?: number;
   name: string;
-  uniqueId: string; // IMEI o identificador único del dispositivo GPS / App
+  uniqueId?: string; // IMEI o identificador único del dispositivo GPS / App
   groupId?: number;
   attributes?: Record<string, any>;
 }
