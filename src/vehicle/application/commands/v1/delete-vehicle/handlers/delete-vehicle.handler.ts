@@ -29,16 +29,19 @@ export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleComman
     const oldValues = { ...vehicle };
 
     // 2. Eliminación lógica (Estado BAJA)
+    const oldTraccarId = vehicle.traccarId;
     vehicle.status = VehicleStatus.BAJA;
+    vehicle.traccarId = null;
+    vehicle.traccarDeviceId = null;
 
     // 3. Guardar
     const saveResult = await this.vehicleRepository.save(vehicle);
     
     if (saveResult.isOk()) {
-      if (vehicle.traccarId) {
-        this.vehicleTenantCache.removeVehicleState(vehicle.traccarId, vehicle.id);
+      if (oldTraccarId) {
+        this.vehicleTenantCache.removeVehicleState(oldTraccarId, vehicle.id);
         // Dar de baja físicamente en Traccar
-        await this.traccarProvider.deleteDevice(vehicle.traccarId);
+        await this.traccarProvider.deleteDevice(oldTraccarId);
       }
 
       // 4. Registrar en auditoría

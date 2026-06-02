@@ -6,20 +6,22 @@ import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.reposito
 import { VehicleEntity, VehicleStatus } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
+import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
 
 @CommandHandler(UpdateVehicleStatusCommand)
 export class UpdateVehicleStatusHandler implements ICommandHandler<UpdateVehicleStatusCommand> {
   constructor(
     @Inject('VehicleRepository')
     private readonly vehicleRepository: VehicleRepository,
+    @Inject('ITraccarProvider')
+    private readonly traccarProvider: ITraccarProvider,
     private readonly auditService: AuditService,
+    private readonly vehicleTenantCache: VehicleTenantCache,
   ) {}
 
   /**
    * Ejecuta la actualización de estado de un vehículo.
-   * 
-   * @param command - Datos: vehicleId e isActive
-   * @returns Result con la entidad actualizada o error si no existe
    */
   async execute(command: UpdateVehicleStatusCommand): Promise<Result<VehicleEntity, AppError>> {
     // 1. Buscar el vehículo
@@ -30,15 +32,57 @@ export class UpdateVehicleStatusHandler implements ICommandHandler<UpdateVehicle
 
     const vehicle = vehicleResult.value;
     const oldStatus = vehicle.status;
+    const oldTraccarId = vehicle.traccarId;
 
     // 2. Actualizar el estado
     vehicle.status = command.status;
 
-    // 3. Guardar cambios
+    // 3. Gestionar Traccar si pasa a BAJA o si se reactiva desde BAJA
+    if (command.status === VehicleStatus.BAJA && oldStatus !== VehicleStatus.BAJA) {
+      // Si se da de baja, desafiliar en Traccar y en caché
+      vehicle.traccarId = null;
+      vehicle.traccarDeviceId = null;
+      if (oldTraccarId) {
+        this.vehicleTenantCache.removeVehicleState(oldTraccarId, vehicle.id);
+        await this.traccarProvider.deleteDevice(oldTraccarId);
+      }
+    } else if ((command.status === VehicleStatus.OPERATIVO || command.status === VehicleStatus.TALLER) && oldStatus === VehicleStatus.BAJA) {
+      // Si se reactiva desde BAJA, volver a registrar en Traccar si tiene IMEI
+      if (vehicle.traccarDeviceId) {
+        const existsResult = await this.traccarProvider.checkDeviceExists(vehicle.traccarDeviceId);
+        if (existsResult.isOk() && existsResult.value === false) {
+          const traccarResult = await this.traccarProvider.createDevice({
+            name: vehicle.plate,
+            uniqueId: vehicle.traccarDeviceId,
+          });
+          if (traccarResult.isOk()) {
+            vehicle.traccarId = traccarResult.value.id ?? null;
+          }
+        }
+      }
+    }
+
+    // 4. Guardar cambios
     const saveResult = await this.vehicleRepository.save(vehicle);
     
     if (saveResult.isOk()) {
-      // 4. Registrar en auditoría (sin esperar, proceso en segundo plano)
+      const savedVehicle = saveResult.value;
+      
+      // Sincronizar en caliente la caché si está activo y tiene traccarId
+      if (savedVehicle.status !== VehicleStatus.BAJA && savedVehicle.traccarId) {
+        this.vehicleTenantCache.setVehicleState(savedVehicle.traccarId, {
+          vehicleId: savedVehicle.id,
+          tenantId: savedVehicle.tenantId,
+          dailyTicketId: null,
+          plate: savedVehicle.plate,
+          driverName: 'No asignado',
+          driverId: null,
+          routeId: null,
+          direction: null,
+        });
+      }
+
+      // 5. Registrar en auditoría
       this.auditService.createLog({
         tenantId: command.tenantId,
         userId: command.userId,

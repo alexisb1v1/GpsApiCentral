@@ -3,7 +3,7 @@ import { Result, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { UpdateVehicleCommand } from '../update-vehicle.command';
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
-import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
+import { VehicleEntity, VehicleStatus } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
@@ -34,31 +34,47 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
       if (existing.isOk()) return err('ALREADY_EXISTS');
     }
 
-    // 3. Gestión del identificador (IMEI) en Traccar solo si cambió
+    // 3. Gestión del identificador (IMEI) en Traccar solo si cambió o si se reactiva desde BAJA
     const newTraccarId = command.traccarDeviceId ?? null;
     let traccarId = vehicle.traccarId;
+    const isReactivating = oldValues.status === VehicleStatus.BAJA && 
+      (command.status === VehicleStatus.OPERATIVO || command.status === VehicleStatus.TALLER);
 
-    if (newTraccarId !== vehicle.traccarDeviceId) {
+    // Si se pasa a BAJA, forzar la desafiliación y eliminación de Traccar
+    if (command.status === VehicleStatus.BAJA && oldValues.status !== VehicleStatus.BAJA) {
+      traccarId = null;
+      vehicle.traccarDeviceId = null;
+      if (oldValues.traccarId) {
+        this.vehicleTenantCache.removeVehicleState(oldValues.traccarId, vehicle.id);
+        await this.traccarProvider.deleteDevice(oldValues.traccarId);
+      }
+    } else if (newTraccarId !== vehicle.traccarDeviceId || (isReactivating && newTraccarId)) {
       if (newTraccarId) {
         // 3.1. Verificar si ya existe en Traccar
         const existsResult = await this.traccarProvider.checkDeviceExists(newTraccarId);
         if (existsResult.isErr()) {
           return err('TRACCAR_API_ERROR');
         }
-        if (existsResult.value === true) {
+        
+        if (existsResult.value === true && !isReactivating) {
           return err('TRACCAR_DEVICE_ALREADY_EXISTS');
         }
 
-        // 3.2. No existe → crearlo en Traccar
-        const traccarResult = await this.traccarProvider.createDevice({
-          name: command.plate,
-          uniqueId: newTraccarId,
-        });
-        if (traccarResult.isErr()) {
-          return err('TRACCAR_API_ERROR');
-        }
+        if (existsResult.value === false) {
+          // 3.2. No existe → crearlo en Traccar
+          const traccarResult = await this.traccarProvider.createDevice({
+            name: command.plate,
+            uniqueId: newTraccarId,
+          });
+          if (traccarResult.isErr()) {
+            return err('TRACCAR_API_ERROR');
+          }
 
-        traccarId = traccarResult.value.id ?? null;
+          traccarId = traccarResult.value.id ?? null;
+        } else {
+          // Si ya existía y es reactivación, y teníamos el traccarId guardado, lo preservamos
+          traccarId = oldValues.traccarId;
+        }
       } else {
         traccarId = null;
       }

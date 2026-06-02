@@ -16,7 +16,28 @@ export class CreateVehicleDocumentHandler implements ICommandHandler<CreateVehic
   ) {}
 
   async execute(command: CreateVehicleDocumentCommand): Promise<Result<VehicleDocumentEntity, AppError>> {
-    const document = new VehicleDocumentEntity();
+    // 1. Buscar si ya existen documentos para este vehículo
+    const docsResult = await this.repository.findByVehicleId(command.vehicleId);
+    let document: VehicleDocumentEntity;
+    let action: 'CREATE' | 'UPDATE' = 'CREATE';
+
+    if (docsResult.isOk()) {
+      // 2. Filtrar por el tipo de documento para ver si ya está registrado
+      const existingDoc = docsResult.value.find(
+        (doc) => doc.documentType === command.documentType,
+      );
+
+      if (existingDoc) {
+        document = existingDoc;
+        action = 'UPDATE';
+      } else {
+        document = new VehicleDocumentEntity();
+      }
+    } else {
+      document = new VehicleDocumentEntity();
+    }
+
+    // 3. Asignar/actualizar campos
     document.vehicleId = command.vehicleId;
     document.tenantId = command.tenantId;
     document.documentType = command.documentType;
@@ -24,6 +45,7 @@ export class CreateVehicleDocumentHandler implements ICommandHandler<CreateVehic
     document.expirationDate = command.expirationDate ? new Date(command.expirationDate) : null;
     document.notifyExpiration = command.notifyExpiration;
 
+    // 4. Guardar
     const saveResult = await this.repository.save(document);
 
     if (saveResult.isOk()) {
@@ -31,7 +53,7 @@ export class CreateVehicleDocumentHandler implements ICommandHandler<CreateVehic
       this.auditService.createLog({
         tenantId: command.tenantId,
         userId: command.userId,
-        action: 'CREATE',
+        action: action,
         entityName: 'vehicle_documents',
         entityId: saved.id,
         newValues: saved,
