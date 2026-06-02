@@ -93,4 +93,19 @@ export class TypeOrmDailyTicketRepository implements DailyTicketRepository {
       return err('INTERNAL_ERROR');
     }
   }
+
+  async findByDriverAndDate(driverId: string, workDate: string): Promise<Result<DailyTicketEntity | null, AppError>> {
+    try {
+      const ticket = await this.repository.findOne({
+        where: {
+          driverId,
+          workDate: workDate as any
+        }
+      });
+      return ok(ticket);
+    } catch (error) {
+      console.error('Error finding daily ticket by driver and date:', error);
+      return err('INTERNAL_ERROR');
+    }
+  }
 }

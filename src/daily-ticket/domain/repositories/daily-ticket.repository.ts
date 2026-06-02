@@ -10,4 +10,5 @@ export interface DailyTicketRepository {
   findById(id: string): Promise<Result<DailyTicketEntity, AppError>>;
   saveRound(round: DailyRoundEntity): Promise<Result<DailyRoundEntity, AppError>>;
   findByTenantAndDate(tenantId: string, date: string): Promise<Result<DailyTicketEntity[], AppError>>;
+  findByDriverAndDate(driverId: string, workDate: string): Promise<Result<DailyTicketEntity | null, AppError>>;
 }

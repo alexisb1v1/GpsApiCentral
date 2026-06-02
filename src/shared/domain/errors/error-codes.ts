@@ -70,6 +70,11 @@ export const ERROR_CODES = {
     errorCode: 'BIZ_001',
     message: 'El recurso ya existe',
   },
+  DRIVER_ALREADY_ASSIGNED: {
+    statusCode: 409,
+    errorCode: 'BIZ_002',
+    message: 'El conductor especificado ya cuenta con una unidad asignada para este día de trabajo',
+  },
 
   // Errores de integración externa
   TRACCAR_API_ERROR: {

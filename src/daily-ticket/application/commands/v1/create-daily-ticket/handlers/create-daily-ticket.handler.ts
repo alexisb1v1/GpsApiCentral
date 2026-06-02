@@ -84,10 +84,18 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
     // 2. Determinar la fecha de trabajo (default hoy)
     const workDate = command.workDate || new Date().toISOString().split('T')[0];
 
-    // 3. Verificar si ya existe un ticket para ese día
+    // 3. Verificar si ya existe un ticket para ese día (mismo vehículo)
     const existingTicketResult = await this.dailyTicketRepository.findByVehicleAndDate(command.vehicleId, workDate);
     if (existingTicketResult.isOk() && existingTicketResult.value) {
       return err('ALREADY_EXISTS');
+    }
+
+    // 3.1 Verificar si el chofer ya tiene una asignación activa en este día
+    if (command.driverId) {
+      const existingDriverTicketResult = await this.dailyTicketRepository.findByDriverAndDate(command.driverId, workDate);
+      if (existingDriverTicketResult.isOk() && existingDriverTicketResult.value) {
+        return err('DRIVER_ALREADY_ASSIGNED');
+      }
     }
 
     // 4. Iniciar transacción manual para control de secuencias y pessimistic locking
