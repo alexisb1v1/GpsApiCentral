@@ -5,16 +5,20 @@ import { ConfigService } from '@nestjs/config';
 import { Subject } from 'rxjs';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
+import { RouteEntity } from '@route/domain/entities/route.entity';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 
 export interface CachedVehicleState {
   vehicleId: string;
   tenantId: string;
+  tenantName?: string; // Opcional, para el visor legible
   dailyTicketId: string | null; // UUID del ticket si pagó hoy, o null si no
   plate: string;
   driverName: string | null;
   driverId: string | null; // ID del conductor
   routeId: string | null; // ID de la ruta asignada
+  routeName?: string; // Opcional, para el visor legible
   direction: 'IDA' | 'VUELTA' | null; // Dirección activa de la ruta
   lastPosition?: any; // Última posición conocida reportada por Traccar
 }
@@ -42,6 +46,10 @@ export class VehicleTenantCache implements OnModuleInit {
     private readonly vehicleRepository: Repository<VehicleEntity>,
     @InjectRepository(DailyTicketEntity)
     private readonly ticketRepository: Repository<DailyTicketEntity>,
+    @InjectRepository(TenantEntity)
+    private readonly tenantRepository: Repository<TenantEntity>,
+    @InjectRepository(RouteEntity)
+    private readonly routeRepository: Repository<RouteEntity>,
     private readonly configService: ConfigService,
     @Inject('ITraccarProvider')
     private readonly traccarProvider: ITraccarProvider,
@@ -63,6 +71,19 @@ export class VehicleTenantCache implements OnModuleInit {
         this.logger.log('Iniciando precarga de caché de vehículos y tickets diarios...');
         this.cache.clear();
         this.vehicleIdToTraccarId.clear();
+
+        // Cargar mapas de nombres legibles para cooperativas y rutas
+        const tenantsList = await this.tenantRepository.find();
+        const tenantMap = new Map<string, string>();
+        for (const t of tenantsList) {
+          tenantMap.set(t.id, t.name);
+        }
+
+        const routesList = await this.routeRepository.find();
+        const routeMap = new Map<string, string>();
+        for (const r of routesList) {
+          routeMap.set(r.id, r.name);
+        }
 
         // 1. Obtener todos los vehículos con traccarDeviceId configurado
         const vehicles = await this.vehicleRepository.find() as any[];
@@ -168,11 +189,13 @@ export class VehicleTenantCache implements OnModuleInit {
           const state: CachedVehicleState = {
             vehicleId: vehicle.id,
             tenantId: vehicle.tenantId,
+            tenantName: tenantMap.get(vehicle.tenantId) || 'No especificado',
             dailyTicketId: ticketData ? ticketData.ticketId : null,
             plate: vehicle.plate,
             driverName: ticketData ? ticketData.driverName : 'No asignado',
             driverId: ticketData ? ticketData.driverId : null,
             routeId: ticketData ? ticketData.routeId : null,
+            routeName: ticketData && ticketData.routeId ? (routeMap.get(ticketData.routeId) || 'Sin Ruta') : 'Sin Ruta',
             direction: ticketData ? ticketData.direction : null,
           };
 
@@ -289,6 +312,7 @@ export class VehicleTenantCache implements OnModuleInit {
       let driverName = 'No asignado';
       let driverId: string | null = null;
       let routeId: string | null = null;
+      let routeName = 'Sin Ruta';
       let direction: 'IDA' | 'VUELTA' | null = null;
       if (dailyTicketId) {
         try {
@@ -300,6 +324,11 @@ export class VehicleTenantCache implements OnModuleInit {
             driverName = ticket.driver ? ticket.driver.name : 'No asignado';
             driverId = ticket.driverId || null;
             routeId = ticket.routeId || null;
+            
+            if (ticket.routeId) {
+              const routeObj = await this.routeRepository.findOne({ where: { id: ticket.routeId } });
+              routeName = routeObj ? routeObj.name : 'Sin Ruta';
+            }
             
             if (ticket.rounds && ticket.rounds.length > 0) {
               const activeRound = ticket.rounds.find(r => r.status === 'IN_PROGRESS') || ticket.rounds[ticket.rounds.length - 1];
@@ -316,6 +345,7 @@ export class VehicleTenantCache implements OnModuleInit {
       currentState.driverName = driverName;
       currentState.driverId = driverId;
       currentState.routeId = routeId;
+      currentState.routeName = routeName;
       currentState.direction = direction;
       this.cache.set(traccarId, currentState);
       this.logger.log(`Caché actualizada en caliente: Vehículo ID ${vehicleId} -> Ticket ID ${dailyTicketId}, Chofer: ${driverName} (ID: ${driverId}), Ruta: ${routeId}, Dirección: ${direction}`);
@@ -399,40 +429,59 @@ export class VehicleTenantCache implements OnModuleInit {
   /**
    * Fuerza el reinicio completo de la caché en memoria y la hidratación desde la base de datos fresca.
    */
-  async resetCache(): Promise<void> {
-    this.logger.log('[Cache] Forzando el reinicio completo de la caché de vehículos y tickets...');
+  async resetCache(options?: { unlinkDevices?: boolean }): Promise<void> {
+    const unlink = options?.unlinkDevices ?? true;
+    this.logger.log(`[Cache] Forzando el reinicio completo de la caché de vehículos y tickets. ¿Desvincular de Traccar?: ${unlink}`);
 
-    // DESAFILIAR EN LOTE DE GRUPOS EN TRACCAR ANTES DE LIMPIAR LA MEMORIA
-    try {
-      const activeVehicles = Array.from(this.cache.entries())
-        .filter(([traccarId, state]) => state.dailyTicketId !== null)
-        .map(([traccarId, state]) => ({
-          traccarId,
-          plate: state.plate
-        }));
+    if (unlink) {
+      // DESAFILIAR EN LOTE DE GRUPOS EN TRACCAR ANTES DE LIMPIAR LA MEMORIA
+      try {
+        const activeVehicles = Array.from(this.cache.entries())
+          .filter(([traccarId, state]) => state.dailyTicketId !== null)
+          .map(([traccarId, state]) => ({
+            traccarId,
+            plate: state.plate
+          }));
 
-      if (activeVehicles.length > 0) {
-        this.logger.log(`[Cache - Fin de Día] Desafiliando ${activeVehicles.length} vehículo(s) de sus grupos de ruta en Traccar...`);
-        const updatePromises = activeVehicles.map(async (v) => {
-          // Busquemos en base de datos el vehículo para obtener su uniqueId (traccarDeviceId) real
-          const vehicleObj = await this.vehicleRepository.findOne({ where: { traccarId: v.traccarId } });
-          if (vehicleObj && vehicleObj.traccarDeviceId) {
-            await this.traccarProvider.updateDevice(v.traccarId, {
-              name: vehicleObj.plate,
-              uniqueId: vehicleObj.traccarDeviceId,
-              groupId: 0 // 0 remueve el grupo en la API de Traccar
-            });
-          }
-        });
-        
-        await Promise.allSettled(updatePromises);
-        this.logger.log(`[Cache - Fin de Día] Desafiliación en lote completada con éxito.`);
+        if (activeVehicles.length > 0) {
+          this.logger.log(`[Cache - Fin de Día] Desafiliando ${activeVehicles.length} vehículo(s) de sus grupos de ruta en Traccar...`);
+          const updatePromises = activeVehicles.map(async (v) => {
+            // Busquemos en base de datos el vehículo para obtener su uniqueId (traccarDeviceId) real
+            const vehicleObj = await this.vehicleRepository.findOne({ where: { traccarId: v.traccarId } });
+            if (vehicleObj && vehicleObj.traccarDeviceId) {
+              await this.traccarProvider.updateDevice(v.traccarId, {
+                name: vehicleObj.plate,
+                uniqueId: vehicleObj.traccarDeviceId,
+                groupId: 0 // 0 remueve el grupo en la API de Traccar
+              });
+            }
+          });
+          
+          await Promise.allSettled(updatePromises);
+          this.logger.log(`[Cache - Fin de Día] Desafiliación en lote completada con éxito.`);
+        }
+      } catch (err: any) {
+        this.logger.error(`[Cache - Fin de Día] Error al desafiliar vehículos en lote de Traccar: ${err.message}`);
       }
-    } catch (err: any) {
-      this.logger.error(`[Cache - Fin de Día] Error al desafiliar vehículos en lote de Traccar: ${err.message}`);
     }
 
     this.preloadPromise = null;
     await this.preloadCache();
+  }
+
+  /**
+   * Obtiene una previsualización de diagnóstico de la caché en caliente
+   */
+  getCacheStatus(): any[] {
+    const list: any[] = [];
+    for (const [traccarId, state] of this.cache.entries()) {
+      list.push({
+        traccarDeviceId: traccarId,
+        ...state,
+        hasActiveTicket: !!state.dailyTicketId,
+      });
+    }
+    // Ordenar por placa para facilitar el diagnóstico
+    return list.sort((a, b) => a.plate.localeCompare(b.plate));
   }
 }
