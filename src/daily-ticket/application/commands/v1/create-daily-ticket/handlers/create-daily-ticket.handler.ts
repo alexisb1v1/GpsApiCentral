@@ -185,7 +185,7 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
 
       await queryRunner.manager.save(round);
 
-      // E. Crear e guardar el pago en la nueva tabla payments
+      // E. Crear e guardar el pago en la tabla payments
       const payment = new PaymentEntity();
       payment.tenantId = command.tenantId;
       payment.dailyTicketId = savedTicket.id;
@@ -211,10 +211,11 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
       this.vehicleTenantCache.setDailyTicketId(savedTicket.vehicleId, savedTicket.id);
 
       // Sincronizar en Traccar: Vincular el vehículo al grupo de la ruta
-      if (vehicle.traccarId && route && route.traccarGroupId) {
+      if (vehicle.traccarId && route && route.traccarGroupId && vehicle.traccarDeviceId) {
         this.traccarProvider.updateDevice(vehicle.traccarId, {
+          id: vehicle.traccarId,
           name: vehicle.plate,
-          uniqueId: vehicle.traccarDeviceId || '',
+          uniqueId: vehicle.traccarDeviceId,
           groupId: route.traccarGroupId
         }).then(res => {
           if (res.isErr()) {
