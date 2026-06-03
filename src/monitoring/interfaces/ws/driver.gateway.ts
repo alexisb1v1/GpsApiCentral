@@ -126,9 +126,9 @@ export class DriverGateway implements OnGatewayConnection, OnGatewayInit, OnModu
    */
   private subscribeToCacheUpdates() {
     this.cacheSubscription = this.vehicleTenantCache.cacheUpdates$.subscribe({
-      next: ({ vehicleId, state }) => {
+      next: ({ vehicleId, state, previousDriverId }) => {
         try {
-          // Si el vehículo tiene un conductor y tiene posición de GPS, notificar de inmediato
+          // 1. Si hay un conductor asignado ahora, notificarle su nueva asignación
           if (state.driverId && state.lastPosition) {
             const enrichedPosition = {
               ...state.lastPosition,
@@ -143,6 +143,14 @@ export class DriverGateway implements OnGatewayConnection, OnGatewayInit, OnModu
             };
             this.emitPositionToDriver(state.driverId, enrichedPosition);
             this.logger.log(`[Driver WS Cache Sync] Notificada asignación en caliente de vehículo ${vehicleId} al chofer ${state.driverId}`);
+          }
+
+          // 2. Si el conductor anterior ya no es el actual, enviarle una señal vacía para limpiar su interfaz
+          if (previousDriverId && previousDriverId !== state.driverId) {
+            if (this.server) {
+              this.server.to(`driver:${previousDriverId}`).emit('positions', []);
+              this.logger.log(`[Driver WS Cache Sync] Notificada desvinculación de vehículo ${vehicleId} en tiempo real al chofer ${previousDriverId}`);
+            }
           }
         } catch (error: any) {
           this.logger.error(`Error al procesar actualización de caché en DriverGateway: ${error.message}`);

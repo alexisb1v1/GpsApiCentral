@@ -35,7 +35,7 @@ export class VehicleTenantCache implements OnModuleInit {
   private readonly logger = new Logger(VehicleTenantCache.name);
   
   // Stream de actualizaciones en caliente para componentes reactivos (como WebSockets)
-  public readonly cacheUpdates$ = new Subject<{ vehicleId: string; state: CachedVehicleState }>();
+  public readonly cacheUpdates$ = new Subject<{ vehicleId: string; state: CachedVehicleState; previousDriverId?: string | null }>();
   
   // Mapa en memoria: traccarDeviceId (número) -> CachedVehicleState
   private readonly cache = new Map<number, CachedVehicleState>();
@@ -359,6 +359,9 @@ export class VehicleTenantCache implements OnModuleInit {
 
     const currentState = this.cache.get(traccarId);
     if (currentState) {
+      // Guardar el driverId anterior antes de la actualización
+      const previousDriverId = currentState.driverId;
+
       currentState.dailyTicketId = dailyTicketId;
       
       let driverName = 'No asignado';
@@ -422,7 +425,7 @@ export class VehicleTenantCache implements OnModuleInit {
       this.logger.log(`Caché actualizada en caliente: Vehículo ID ${vehicleId} -> Ticket ID ${dailyTicketId}, Chofer: ${driverName} (ID: ${driverId}), Ruta: ${routeId}, Dirección: ${direction}, Vuelta: ${roundId} (${roundStatus}), Multas: ${hasPendingInfractions}`);
       
       // Notificar reactivamente a los suscriptores (WebSockets)
-      this.cacheUpdates$.next({ vehicleId, state: currentState });
+      this.cacheUpdates$.next({ vehicleId, state: currentState, previousDriverId });
     }
   }
 
