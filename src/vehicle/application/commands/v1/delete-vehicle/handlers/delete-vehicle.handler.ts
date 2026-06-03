@@ -6,7 +6,7 @@ import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.reposito
 import { VehicleStatus } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
-import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 
 @CommandHandler(DeleteVehicleCommand)

@@ -11,6 +11,8 @@ import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.en
 import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
+import { getLocalDateString } from '@shared/utils/date.util';
+
 
 @CommandHandler(CreateInfractionCommand)
 export class CreateInfractionHandler implements ICommandHandler<CreateInfractionCommand> {
@@ -37,13 +39,7 @@ export class CreateInfractionHandler implements ICommandHandler<CreateInfraction
     }
 
     // 2. Buscar ticket diario activo de hoy para este vehículo y su respectiva vuelta (Round)
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const todayStr = formatter.format(new Date()); // Formato YYYY-MM-DD
+    const todayStr = getLocalDateString(); // Formato YYYY-MM-DD
 
     const ticket = await this.ticketRepository.findOne({
       where: {

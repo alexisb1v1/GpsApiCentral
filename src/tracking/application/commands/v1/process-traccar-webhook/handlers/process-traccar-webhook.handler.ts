@@ -2,7 +2,7 @@ import { CommandHandler, ICommandHandler, EventBus } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { ProcessTraccarWebhookCommand } from '../process-traccar-webhook.command';
 import { randomUUID } from 'crypto';
-import { DriverNotificationSentEvent } from '../../../../../../monitoring/domain/events/driver-notification-sent.event';
+import { DriverNotificationSentEvent } from '@monitoring/domain/events/driver-notification-sent.event';
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketRepository } from '@daily-ticket/domain/repositories/daily-ticket.repository';
@@ -13,8 +13,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThanOrEqual, In } from 'typeorm';
 import { RouteStopEntity } from '@route/domain/entities/route-stop.entity';
 import { InfractionEntity, InfractionType, InfractionStatus } from '@infraction/domain/entities/infraction.entity';
-import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 import { RoundsStatus } from '@daily-ticket/domain/entities/daily-round.entity';
+import { getLocalDateString, getLocalTimeString } from '@shared/utils/date.util';
+
 
 export enum GeofenceType {
   START = 'START',
@@ -60,13 +62,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     if (!routeStop) return;
 
     // 3. Buscar Ticket Diario Activo (para saber la Ruta) en la zona horaria local (America/Lima / Pucallpa)
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const today = formatter.format(new Date(position.fixTime));
+    const today = getLocalDateString(new Date(position.fixTime));
     const ticketResult = await this.dailyTicketRepository.findActiveByVehicle(vehicle.id, today);
     if (ticketResult.isErr() || !ticketResult.value) return;
     const ticket = ticketResult.value;
@@ -227,8 +223,8 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
       infraction.amount = 10.00;
       infraction.status = InfractionStatus.PENDING;
       
-      const scheduledStr = scheduledTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
-      const arrivalStr = arrivalTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
+      const scheduledStr = getLocalTimeString(scheduledTime);
+      const arrivalStr = getLocalTimeString(arrivalTime);
       
       infraction.description = `Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
       
@@ -291,8 +287,8 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     });
 
     if (delayMinutes > 2) {
-      const scheduledStr = scheduledTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
-      const arrivalStr = satTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
+      const scheduledStr = getLocalTimeString(scheduledTime);
+      const arrivalStr = getLocalTimeString(satTime);
       const description = `[Rectificado por Satélite] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
 
       if (existingInfraction) {

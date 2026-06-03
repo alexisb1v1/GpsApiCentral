@@ -6,6 +6,8 @@ import { GetDashboardMetricsQuery } from './get-dashboard-metrics.query';
 import { VehicleEntity, VehicleStatus } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { InfractionEntity } from '@infraction/domain/entities/infraction.entity';
+import { getLocalDateString } from '@shared/utils/date.util';
+
 
 @QueryHandler(GetDashboardMetricsQuery)
 export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMetricsQuery> {
@@ -22,13 +24,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
     const { tenantId } = query;
 
     // 1. Obtener la fecha de trabajo actual en huso horario local de Lima/Pucallpa
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const todayStr = formatter.format(new Date()); // Formato YYYY-MM-DD
+    const todayStr = getLocalDateString(); // Formato YYYY-MM-DD
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);

@@ -7,7 +7,7 @@ import { VehicleEntity, VehicleStatus } from '@vehicle/domain/entities/vehicle.e
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
-import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 
 @CommandHandler(UpdateVehicleStatusCommand)
 export class UpdateVehicleStatusHandler implements ICommandHandler<UpdateVehicleStatusCommand> {

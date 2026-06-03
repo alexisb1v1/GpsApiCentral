@@ -7,7 +7,7 @@ import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
-import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 
 @CommandHandler(CreateVehicleCommand)
 export class CreateVehicleHandler implements ICommandHandler<CreateVehicleCommand> {

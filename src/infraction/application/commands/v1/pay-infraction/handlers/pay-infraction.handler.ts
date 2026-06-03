@@ -7,7 +7,7 @@ import { InfractionRepository } from '@infraction/domain/repositories/infraction
 import { InfractionEntity, InfractionStatus } from '@infraction/domain/entities/infraction.entity';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
-import { PaymentEntity } from '../../../../../../payment/domain/entities/payment.entity';
+import { PaymentEntity } from '@payment/domain/entities/payment.entity';
 import { DocumentSequenceEntity } from '@shared/domain/entities/document-sequence.entity';
 import { DocumentTypeConstants } from '@shared/domain/constants/document-type.constants';
 

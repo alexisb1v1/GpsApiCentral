@@ -22,7 +22,10 @@
       "@tracking/*": ["src/tracking/*"],
       "@geofence/*": ["src/geofence/*"],
       "@driver/*": ["src/driver/*"],
-      "@monitoring/*": ["src/monitoring/*"]
+      "@monitoring/*": ["src/monitoring/*"],
+      "@audit-log/*": ["src/audit-log/*"],
+      "@dashboard/*": ["src/dashboard/*"],
+      "@payment/*": ["src/payment/*"]
     },
     "incremental": true,
     "skipLibCheck": true,

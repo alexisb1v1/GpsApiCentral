@@ -13,6 +13,8 @@ import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.en
 import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 import { InfractionEntity, InfractionStatus, InfractionType } from '@infraction/domain/entities/infraction.entity';
 import { Public } from '@shared/infrastructure/decorators/public.decorator';
+import { getLocalDateString } from '@shared/utils/date.util';
+
 
 export class SimulateInfractionRequestDto {
   @ApiProperty({ example: 'driver-user-uuid', description: 'ID del usuario/chofer a notificar' })
@@ -86,13 +88,7 @@ export class CreateInfractionController {
   @ApiOperation({ summary: 'Simular y guardar notificación en tiempo real a la app del chofer (Pruebas Internas)' })
   async simulateNotification(@Body() dto: SimulateInfractionRequestDto) {
     // 1. Obtener la fecha de hoy en la zona horaria local 'America/Lima'
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const today = formatter.format(new Date());
+    const today = getLocalDateString();
 
     // 2. Buscar si el conductor tiene un ticket diario de viaje activo registrado hoy
     const ticket = await this.ticketTypeOrmRepository.findOne({

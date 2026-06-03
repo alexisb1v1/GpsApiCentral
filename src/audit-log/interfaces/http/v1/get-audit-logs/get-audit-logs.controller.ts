@@ -6,7 +6,7 @@ import { RolesGuard } from '@shared/infrastructure/guards/roles.guard';
 import { matchResult } from '@common/http/match-result';
 import { GetAuditLogsRequestDto } from './dto/get-audit-logs.request.dto';
 import { GetAuditLogsResponseDto, AuditLogItemDto } from './dto/get-audit-logs.response.dto';
-import { GetAuditLogsQuery } from '../../../../application/queries/v1/get-audit-logs/get-audit-logs.query';
+import { GetAuditLogsQuery } from '@audit-log/application/queries/v1/get-audit-logs/get-audit-logs.query';
 import { AuditLogEntity } from '@shared/domain/entities/audit-log.entity';
 import { PaginatedResult } from '@common/interfaces/paginated-result.interface';
 

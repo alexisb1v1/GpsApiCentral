@@ -9,14 +9,16 @@ import { DailyRoundEntity, RoundsStatus } from '@daily-ticket/domain/entities/da
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
 import { AppError } from '@shared/domain/errors/app-errors';
 import { AuditService } from '@shared/application/services/audit.service';
-import { VehicleTenantCache } from '../../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 import { DocumentSequenceEntity } from '@shared/domain/entities/document-sequence.entity';
-import { PaymentEntity } from '../../../../../../payment/domain/entities/payment.entity';
+import { PaymentEntity } from '@payment/domain/entities/payment.entity';
 import { DocumentTypeConstants } from '@shared/domain/constants/document-type.constants';
 import { DriverInfoRepository } from '@driver/domain/repositories/driver-info.repository';
-import { RouteRepository } from '../../../../../../route/domain/repositories/route.repository';
+import { RouteRepository } from '@route/domain/repositories/route.repository';
 import { UserRepository } from '@user/domain/repositories/user.repository';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
+import { getLocalDateString } from '@shared/utils/date.util';
+
 
 @CommandHandler(CreateDailyTicketCommand)
 export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTicketCommand> {
@@ -81,8 +83,9 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
       }
     }
 
-    // 2. Determinar la fecha de trabajo (default hoy)
-    const workDate = command.workDate || new Date().toISOString().split('T')[0];
+    // 2. Determinar la fecha de trabajo (default hoy en zona horaria local de America/Lima)
+    const workDate = command.workDate || getLocalDateString();
+
 
     // 3. Verificar si ya existe un ticket para ese día (mismo vehículo)
     const existingTicketResult = await this.dailyTicketRepository.findByVehicleAndDate(command.vehicleId, workDate);

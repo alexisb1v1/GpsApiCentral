@@ -5,8 +5,8 @@ import { Repository } from 'typeorm';
 import { VerifyTicketQuery } from './verify-ticket.query';
 import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { InfractionEntity } from '@infraction/domain/entities/infraction.entity';
-import { PaymentEntity } from '../../../../payment/domain/entities/payment.entity';
-import { TenantEntity } from '../../../../tenant/domain/entities/tenant.entity';
+import { PaymentEntity } from '@payment/domain/entities/payment.entity';
+import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
 
 @QueryHandler(VerifyTicketQuery)
 export class VerifyTicketHandler implements IQueryHandler<VerifyTicketQuery> {

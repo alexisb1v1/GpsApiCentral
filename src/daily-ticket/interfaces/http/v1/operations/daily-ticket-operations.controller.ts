@@ -2,15 +2,17 @@ import { Controller, Post, Param, UseGuards, PreconditionFailedException, NotFou
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { JwtAuthGuard } from '@shared/infrastructure/guards/jwt-auth.guard';
-import { DailyTicketEntity, TicketStatus } from '../../../../domain/entities/daily-ticket.entity';
-import { DailyRoundEntity, RoundsStatus } from '../../../../domain/entities/daily-round.entity';
-import { InfractionEntity, InfractionStatus, InfractionType } from '../../../../../infraction/domain/entities/infraction.entity';
-import { VehicleTenantCache } from '../../../../../monitoring/infrastructure/cache/vehicle-tenant.cache';
-import { TrackingEventEntity } from '../../../../../tracking/domain/entities/tracking-event.entity';
-import { RouteStopEntity } from '../../../../../route/domain/entities/route-stop.entity';
+import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { DailyRoundEntity, RoundsStatus } from '@daily-ticket/domain/entities/daily-round.entity';
+import { InfractionEntity, InfractionStatus, InfractionType } from '@infraction/domain/entities/infraction.entity';
+import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
+import { TrackingEventEntity } from '@tracking/domain/entities/tracking-event.entity';
+import { RouteStopEntity } from '@route/domain/entities/route-stop.entity';
 import { EventBus } from '@nestjs/cqrs';
-import { DriverNotificationSentEvent } from '../../../../../monitoring/domain/events/driver-notification-sent.event';
+import { DriverNotificationSentEvent } from '@monitoring/domain/events/driver-notification-sent.event';
 import { randomUUID } from 'crypto';
+import { getLocalTimeString } from '@shared/utils/date.util';
+
 
 export class SyncOfflineCheckpointDto {
   dailyTicketId: string;
@@ -312,8 +314,8 @@ export class DailyTicketOperationsController {
       infraction.amount = 10.00;
       infraction.status = InfractionStatus.PENDING;
 
-      const scheduledStr = scheduledTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
-      const arrivalStr = arrivalTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
+      const scheduledStr = getLocalTimeString(scheduledTime);
+      const arrivalStr = getLocalTimeString(arrivalTime);
 
       infraction.description = `[Sincronización local] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
 

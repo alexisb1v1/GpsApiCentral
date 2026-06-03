@@ -10,6 +10,8 @@ import { RouteEntity } from '@route/domain/entities/route.entity';
 import { DailyRoundEntity, RoundsStatus } from '../../../daily-ticket/domain/entities/daily-round.entity';
 import { InfractionEntity, InfractionStatus } from '../../../infraction/domain/entities/infraction.entity';
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
+import { getLocalDateString } from '@shared/utils/date.util';
+
 
 export interface CachedVehicleState {
   vehicleId: string;
@@ -107,13 +109,7 @@ export class VehicleTenantCache implements OnModuleInit {
         const vehicles = await this.vehicleRepository.find() as any[];
         
         // 2. Obtener los tickets activos del día actual de trabajo en hora de Pucallpa/Lima (America/Lima)
-        const formatter = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'America/Lima',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        });
-        const todayStr = formatter.format(new Date());
+        const todayStr = getLocalDateString();
         
         const activeTickets = await this.ticketRepository.find({
           where: {
@@ -458,13 +454,7 @@ export class VehicleTenantCache implements OnModuleInit {
    * Si es así, realiza un auto-reinicio en segundo plano de manera asíncrona.
    */
   private async checkAndResetCacheIfNewDay(): Promise<void> {
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Lima',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const todayStr = formatter.format(new Date());
+    const todayStr = getLocalDateString();
 
     if (this.lastLoadDate && this.lastLoadDate !== todayStr) {
       this.logger.log(`[Cache] Cambio de día detectado (Antes: ${this.lastLoadDate}, Ahora: ${todayStr}). Reiniciando y precargando caché...`);
