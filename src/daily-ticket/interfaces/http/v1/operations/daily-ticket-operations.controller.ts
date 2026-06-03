@@ -12,6 +12,19 @@ import { EventBus } from '@nestjs/cqrs';
 import { DriverNotificationSentEvent } from '../../../../../monitoring/domain/events/driver-notification-sent.event';
 import { randomUUID } from 'crypto';
 
+export class SyncOfflineCheckpointDto {
+  dailyTicketId: string;
+  roundId: string;
+  traccarGeofenceId: number;
+  reachedAt: string;
+  latitude: number;
+  longitude: number;
+}
+
+export class SyncOfflineCheckpointsDto {
+  checkpoints: SyncOfflineCheckpointDto[];
+}
+
 @Controller('v1/daily-tickets')
 @UseGuards(JwtAuthGuard)
 export class DailyTicketOperationsController {
@@ -325,17 +338,4 @@ export class DailyTicketOperationsController {
       }
     }
   }
-}
-
-export class SyncOfflineCheckpointDto {
-  dailyTicketId: string;
-  roundId: string;
-  traccarGeofenceId: number;
-  reachedAt: string;
-  latitude: number;
-  longitude: number;
-}
-
-export class SyncOfflineCheckpointsDto {
-  checkpoints: SyncOfflineCheckpointDto[];
 }
