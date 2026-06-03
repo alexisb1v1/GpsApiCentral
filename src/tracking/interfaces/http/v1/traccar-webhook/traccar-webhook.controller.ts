@@ -15,7 +15,7 @@ export class TraccarWebhookController {
   @ApiOperation({ summary: 'Recibir eventos de geocercas desde Traccar' })
   async handle(@Body() dto: TraccarWebhookRequestDto) {
     this.logger.log(
-      `📥 Webhook de Traccar recibido. Dispositivo ID: ${dto.device?.id} (${dto.device?.name}), Evento: ${dto.event?.type}, Geocerca ID: ${dto.event?.geofenceId}`
+      `📥 Webhook de Traccar recibido. Dispositivo ID: ${dto.event?.deviceId} (IMEI: ${dto.device?.uniqueId}), Evento: ${dto.event?.type}, Geocerca ID: ${dto.event?.geofenceId}`
     );
 
     // Procesamiento asíncrono vía CQRS
