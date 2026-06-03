@@ -81,6 +81,53 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     });
     const roundId = activeRound ? activeRound.id : null;
 
+    // 3.3. Idempotencia y Algoritmo de Conciliación Horaria (Prevención de Fraude)
+    if (event.type === 'geofenceEnter' && roundId) {
+      const existingEvent = await this.trackingEventRepository.findOne({
+        where: {
+          dailyTicketId: ticket.id,
+          roundId,
+          traccarGeofenceId: event.geofenceId,
+          eventType: 'geofenceEnter' as any
+        }
+      });
+
+      if (existingEvent) {
+        const satTime = new Date(position.fixTime);
+        const pwaTime = existingEvent.serverTime;
+        const timeDiffMs = Math.abs(satTime.getTime() - pwaTime.getTime());
+
+        // Si la diferencia horaria es drástica (mayor a 3 minutos), rectificamos
+        if (timeDiffMs > 3 * 60 * 1000) {
+          existingEvent.serverTime = satTime;
+          existingEvent.rawPayload = {
+            ...existingEvent.rawPayload,
+            audit: {
+              rectifiedByTraccar: true,
+              originalPwaTime: pwaTime.toISOString(),
+              rectifiedTime: satTime.toISOString(),
+              desfaseMinutes: timeDiffMs / 60000
+            }
+          };
+          await this.trackingEventRepository.save(existingEvent);
+
+          // Si es un checkpoint intermedio, recalcular e infraccionar si es necesario
+          if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId) {
+            await this.recalculateOfflineInfraction(
+              ticket,
+              routeStop,
+              satTime,
+              roundId,
+              vehicle.tenantId
+            );
+          }
+        }
+        
+        // Retornar (evitamos duplicar el registro)
+        return;
+      }
+    }
+
     // 3.2. Si el evento es 'geofenceExit' (Salida de paradero), calcular el tiempo de estadía en segundos
     let durationSeconds: number | null = null;
     if (event.type === 'geofenceExit' && roundId) {
@@ -202,6 +249,75 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
             },
           }),
         );
+      }
+    }
+  }
+
+  private async recalculateOfflineInfraction(
+    ticket: DailyTicketEntity,
+    routeStop: RouteStopEntity,
+    satTime: Date,
+    roundId: string,
+    tenantId: string
+  ) {
+    const startStops = await this.routeStopRepository.find({
+      where: { routeId: ticket.routeId as string, type: GeofenceType.START }
+    });
+    const startGeofenceIds = startStops.map(s => s.traccarGeofenceId);
+    if (startGeofenceIds.length === 0) return;
+
+    // Buscar evento de salida de esa vuelta
+    const startEvent = await this.trackingEventRepository.findOne({
+      where: {
+        roundId,
+        eventType: 'geofenceEnter' as any,
+        traccarGeofenceId: In(startGeofenceIds),
+      }
+    });
+
+    if (!startEvent) return;
+
+    const scheduledTime = new Date(startEvent.serverTime.getTime() + routeStop.minutesFromStart * 60000);
+    const delayMinutes = (satTime.getTime() - scheduledTime.getTime()) / 60000;
+
+    // Buscar si ya existía una infracción preliminar creada por la sincronización de la PWA
+    const existingInfraction = await this.infractionRepository.findOne({
+      where: {
+        dailyTicketId: ticket.id,
+        roundId,
+        type: InfractionType.RETRASO_RUTA,
+        status: InfractionStatus.PENDING
+      }
+    });
+
+    if (delayMinutes > 2) {
+      const scheduledStr = scheduledTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
+      const arrivalStr = satTime.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' });
+      const description = `[Rectificado por Satélite] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
+
+      if (existingInfraction) {
+        // Actualizar la infracción preliminar con los datos oficiales
+        existingInfraction.description = description;
+        existingInfraction.amount = 10.00;
+        await this.infractionRepository.save(existingInfraction);
+      } else {
+        // Crear si no existía (por ejemplo, si el sync de la PWA falló pero el satélite reporta la multa)
+        const infraction = new InfractionEntity();
+        infraction.tenantId = tenantId;
+        infraction.vehicleId = ticket.vehicleId;
+        infraction.userId = ticket.driverId || '';
+        infraction.dailyTicketId = ticket.id;
+        infraction.roundId = roundId;
+        infraction.type = InfractionType.RETRASO_RUTA;
+        infraction.amount = 10.00;
+        infraction.status = InfractionStatus.PENDING;
+        infraction.description = description;
+        await this.infractionRepository.save(infraction);
+      }
+    } else {
+      // Si el satélite demuestra que llegó a tiempo, eliminamos la multa preliminar del front
+      if (existingInfraction) {
+        await this.infractionRepository.remove(existingInfraction);
       }
     }
   }

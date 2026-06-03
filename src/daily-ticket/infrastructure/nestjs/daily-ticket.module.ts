@@ -17,6 +17,8 @@ import { RouteModule } from '../../../route/infrastructure/nestjs/route.module';
 import { UserModule } from '@user/infrastructure/nestjs/user.module';
 import { TraccarModule } from '@shared/infrastructure/traccar/traccar.module';
 import { InfractionEntity } from '../../../infraction/domain/entities/infraction.entity';
+import { TrackingEventEntity } from '../../../tracking/domain/entities/tracking-event.entity';
+import { RouteStopEntity } from '../../../route/domain/entities/route-stop.entity';
 
 const CommandHandlers = [CreateDailyTicketHandler];
 const QueryHandlers = [GetDailyTicketsHandler];
@@ -24,7 +26,7 @@ const QueryHandlers = [GetDailyTicketsHandler];
 @Module({
   imports: [
     CqrsModule,
-    TypeOrmModule.forFeature([DailyTicketEntity, DailyRoundEntity, InfractionEntity]),
+    TypeOrmModule.forFeature([DailyTicketEntity, DailyRoundEntity, InfractionEntity, TrackingEventEntity, RouteStopEntity]),
     forwardRef(() => VehicleModule),
     PaymentModule,
     DriverModule,
