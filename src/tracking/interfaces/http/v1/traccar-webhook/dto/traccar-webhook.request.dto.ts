@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsNumber, ValidateNested, IsObject } from 'class-validator';
+import { IsNotEmpty, IsString, IsNumber, ValidateNested, IsObject, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class TraccarEventDto {
@@ -13,10 +13,10 @@ class TraccarEventDto {
   @IsNumber()
   deviceId: number;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsNumber()
-  geofenceId: number;
+  geofenceId?: number;
 }
 
 class TraccarPositionDto {
@@ -51,12 +51,12 @@ export class TraccarWebhookRequestDto {
   @Type(() => TraccarEventDto)
   event: TraccarEventDto;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => TraccarPositionDto)
-  position: TraccarPositionDto;
+  position?: TraccarPositionDto;
 
   @ApiProperty()
   @IsNotEmpty()
