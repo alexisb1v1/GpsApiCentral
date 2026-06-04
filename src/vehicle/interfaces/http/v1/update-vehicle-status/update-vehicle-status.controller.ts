@@ -24,6 +24,7 @@ export class UpdateVehicleStatusController {
       new UpdateVehicleStatusCommand(
         id,
         dto.status,
+        req.user.tenantId,
         req.user.sub,
         audit.ip,
         audit.userAgent,

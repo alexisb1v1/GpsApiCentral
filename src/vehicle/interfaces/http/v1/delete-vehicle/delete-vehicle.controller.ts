@@ -21,6 +21,7 @@ export class DeleteVehicleController {
     const result = await this.commandBus.execute(
       new DeleteVehicleCommand(
         id,
+        req.user.tenantId,
         req.user.sub,
         audit.ip,
         audit.userAgent,
