@@ -17,7 +17,7 @@ export class TraccarWebhookController {
   @ApiOperation({ summary: 'Recibir eventos de geocercas desde Traccar' })
   async handle(@Body() dto: any) {
     // Imprimir el payload bruto recibido
-    console.log('[Webhook Traccar] Raw Body recibido:', JSON.stringify(dto, null, 2));
+    console.log('[Webhook Traccar] Raw Body recibido:', JSON.stringify(dto));
 
     // Si Traccar envía codificado en URL-encoded con strings JSON (común en algunas versiones), decodificarlo
     let payload = dto;
@@ -28,7 +28,7 @@ export class TraccarWebhookController {
           device: dto.device ? JSON.parse(dto.device) : undefined,
           position: dto.position ? JSON.parse(dto.position) : undefined,
         };
-        console.log('[Webhook Traccar] 🛠 Payload decodificado desde strings JSON:', JSON.stringify(payload, null, 2));
+        console.log('[Webhook Traccar] 🛠 Payload decodificado desde strings JSON:', JSON.stringify(payload));
       } catch (e: any) {
         console.error('[Webhook Traccar] ❌ Error al parsear strings JSON del webhook:', e.message);
       }
