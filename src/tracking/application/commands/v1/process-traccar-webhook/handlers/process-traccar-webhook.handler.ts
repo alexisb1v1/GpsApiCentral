@@ -58,7 +58,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     if (!vehicle) return;
 
     // Si no viene geofenceId o position (ej. evento deviceOnline), no se procesa geocercas
-    if (!event.geofenceId || !position || !position.fixTime) return;
+    if (!event.geofenceId || !position || !position.fixTime || position.latitude === undefined || position.longitude === undefined) return;
 
     // 2. Buscar Paradero directamente en route_stops usando el traccarGeofenceId
     const routeStop = await this.routeStopRepository.findOne({
