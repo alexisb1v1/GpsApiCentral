@@ -259,6 +259,8 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
               direction: state.direction, // Dirección (IDA/VUELTA)
               dailyTicketId: state.dailyTicketId, // UUID o null (unidades sin pagar/"piratas")
               hasActiveTicket: !!state.dailyTicketId,
+              roundId: state.roundId || null,
+              roundStatus: state.roundStatus || null,
             };
 
             // Si el vehículo tiene un conductor asignado, retransmitir al canal virtual de choferes en tiempo real

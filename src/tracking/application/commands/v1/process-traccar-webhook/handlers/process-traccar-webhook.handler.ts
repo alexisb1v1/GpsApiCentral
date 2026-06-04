@@ -168,6 +168,23 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
 
     // 6. Si es paradero intermedio (CHECKPOINT), verificar retraso (solo si la vuelta está activa IN_PROGRESS)
     if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId && roundId && activeRound?.status === RoundsStatus.IN_PROGRESS) {
+      // Notificar en tiempo real al conductor que el control fue marcado exitosamente
+      if (ticket.driverId) {
+        this.eventBus.publish(
+          new DriverNotificationSentEvent(ticket.driverId, {
+            id: randomUUID(),
+            type: 'CHECKPOINT_MARKED',
+            title: 'Control Marcado',
+            message: `Has ingresado a: ${routeStop.name || 'Punto de control'}`,
+            timestamp: new Date(),
+            data: {
+              traccarGeofenceId: routeStop.traccarGeofenceId,
+              stopOrder: routeStop.stopOrder,
+            },
+          }),
+        );
+      }
+
       await this.handleCheckpoint(
         ticket, 
         routeStop.traccarGeofenceId, 
@@ -242,6 +259,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
               infractionId: infraction.id,
               amount: infraction.amount,
               delayMinutes: Math.round(delayMinutes),
+              traccarGeofenceId: routeStop.traccarGeofenceId,
             },
           }),
         );

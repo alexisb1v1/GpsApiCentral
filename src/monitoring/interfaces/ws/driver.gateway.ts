@@ -140,6 +140,8 @@ export class DriverGateway implements OnGatewayConnection, OnGatewayInit, OnModu
               direction: state.direction,
               dailyTicketId: state.dailyTicketId,
               hasActiveTicket: !!state.dailyTicketId,
+              roundId: state.roundId || null,
+              roundStatus: state.roundStatus || null,
             };
             this.emitPositionToDriver(state.driverId, enrichedPosition);
             this.logger.log(`[Driver WS Cache Sync] Notificada asignación en caliente de vehículo ${vehicleId} al chofer ${state.driverId}`);
