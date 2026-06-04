@@ -16,14 +16,24 @@ export class TraccarWebhookController {
   @Public()
   @ApiOperation({ summary: 'Recibir eventos de geocercas desde Traccar' })
   async handle(@Body() dto: TraccarWebhookRequestDto) {
+    const eventType = dto.event?.type;
+    const deviceId = dto.event?.deviceId;
+    const uniqueId = dto.device?.uniqueId;
+    const geofenceId = dto.event?.geofenceId;
+
     console.log(
-      `[Webhook] 📥 Evento de Traccar recibido. Dispositivo ID: ${dto.event?.deviceId} (IMEI: ${dto.device?.uniqueId}), Evento: ${dto.event?.type}, Geocerca ID: ${dto.event?.geofenceId}`
+      `[Webhook Traccar] 📥 Evento recibido -> Tipo: ${eventType}, Dispositivo: ${deviceId} (IMEI: ${uniqueId}), Geocerca: ${geofenceId}`
     );
 
-    // Procesamiento asíncrono vía CQRS
-    await this.commandBus.execute(
-      new ProcessTraccarWebhookCommand(dto),
-    );
+    // Procesar únicamente si es entrada o salida de geocerca
+    if (eventType === 'geofenceEnter' || eventType === 'geofenceExit') {
+      // Procesamiento asíncrono vía CQRS
+      await this.commandBus.execute(
+        new ProcessTraccarWebhookCommand(dto),
+      );
+    } else {
+      console.log(`[Webhook Traccar] ℹ️ Evento '${eventType}' ignorado (no es entrada/salida de geocerca).`);
+    }
     
     return { success: true };
   }
