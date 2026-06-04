@@ -3,15 +3,15 @@ import { IsNotEmpty, IsString, IsNumber, ValidateNested, IsObject, IsOptional } 
 import { Type } from 'class-transformer';
 
 class TraccarEventDto {
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  type: string;
+  type?: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsNumber()
-  deviceId: number;
+  deviceId?: number;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -20,36 +20,36 @@ class TraccarEventDto {
 }
 
 class TraccarPositionDto {
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  fixTime: string;
+  fixTime?: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsNumber()
-  latitude: number;
+  latitude?: number;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsNumber()
-  longitude: number;
+  longitude?: number;
 }
 
 class TraccarDeviceDto {
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  uniqueId: string;
+  uniqueId?: string;
 }
 
 export class TraccarWebhookRequestDto {
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => TraccarEventDto)
-  event: TraccarEventDto;
+  event?: TraccarEventDto;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -58,10 +58,10 @@ export class TraccarWebhookRequestDto {
   @Type(() => TraccarPositionDto)
   position?: TraccarPositionDto;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => TraccarDeviceDto)
-  device: TraccarDeviceDto;
+  device?: TraccarDeviceDto;
 }

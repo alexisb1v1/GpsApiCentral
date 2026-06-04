@@ -49,6 +49,8 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     const { payload } = command;
     const { event, device, position } = payload;
 
+    if (!event || !event.deviceId) return;
+
     // 1. Buscar Vehículo por traccarId (ID numérico que envía Traccar en event.deviceId / device.id)
     const vehicle = await this.vehicleTypeOrmRepository.findOne({
       where: { traccarId: event.deviceId }
