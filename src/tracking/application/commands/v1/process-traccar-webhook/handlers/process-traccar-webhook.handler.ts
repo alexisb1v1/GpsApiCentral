@@ -6,11 +6,11 @@ import { DriverNotificationSentEvent } from '@monitoring/domain/events/driver-no
 import { VehicleRepository } from '@vehicle/domain/repositories/vehicle.repository';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketRepository } from '@daily-ticket/domain/repositories/daily-ticket.repository';
-import { DailyTicketEntity } from '@daily-ticket/domain/entities/daily-ticket.entity';
+import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { DailyRoundEntity } from '@daily-ticket/domain/entities/daily-round.entity';
 import { TrackingEventEntity, TrackingEventType } from '@tracking/domain/entities/tracking-event.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThanOrEqual, In } from 'typeorm';
+import { Repository, MoreThanOrEqual, In, EntityManager } from 'typeorm';
 import { RouteStopEntity } from '@route/domain/entities/route-stop.entity';
 import { InfractionEntity, InfractionType, InfractionStatus } from '@infraction/domain/entities/infraction.entity';
 import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
@@ -51,157 +51,191 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
 
     if (!event || !event.deviceId) return;
 
-    // 1. Buscar Vehículo por traccarId (ID numérico que envía Traccar en event.deviceId / device.id)
-    const vehicle = await this.vehicleTypeOrmRepository.findOne({
-      where: { traccarId: event.deviceId }
-    });
-    if (!vehicle) return;
+    await this.trackingEventRepository.manager.transaction(async (transactionalManager) => {
+      // 1. Buscar Vehículo por traccarId
+      const vehicle = await transactionalManager.findOne(VehicleEntity, {
+        where: { traccarId: event.deviceId }
+      });
+      if (!vehicle) return;
 
-    // Si no viene geofenceId o position (ej. evento deviceOnline), no se procesa geocercas
-    if (!event.geofenceId || !position || !position.fixTime || position.latitude === undefined || position.longitude === undefined) return;
+      // Si no viene geofenceId o position, no se procesa geocercas
+      if (!event.geofenceId || !position || !position.fixTime || position.latitude === undefined || position.longitude === undefined) return;
 
-    // 2. Buscar Paradero directamente en route_stops usando el traccarGeofenceId
-    const routeStop = await this.routeStopRepository.findOne({
-      where: { traccarGeofenceId: event.geofenceId }
-    });
-    if (!routeStop) return;
+      // 2. Buscar Paradero directamente en route_stops usando el traccarGeofenceId
+      const routeStop = await transactionalManager.findOne(RouteStopEntity, {
+        where: { traccarGeofenceId: event.geofenceId }
+      });
+      if (!routeStop) return;
 
-    // 3. Buscar Ticket Diario Activo (para saber la Ruta) en la zona horaria local (America/Lima / Pucallpa)
-    const today = getLocalDateString(new Date(position.fixTime));
-    const ticketResult = await this.dailyTicketRepository.findActiveByVehicle(vehicle.id, today);
-    if (ticketResult.isErr() || !ticketResult.value) return;
-    const ticket = ticketResult.value;
-
-    // 3.1. Obtener el round (vuelta) activa actual de este ticket en Postgres (puede estar PENDING o IN_PROGRESS)
-    const activeRound = await this.dailyRoundRepository.findOne({
-      where: [
-        { dailyTicketId: ticket.id, status: RoundsStatus.IN_PROGRESS },
-        { dailyTicketId: ticket.id, status: RoundsStatus.PENDING }
-      ],
-      order: { roundNumber: 'DESC' }
-    });
-    const roundId = activeRound ? activeRound.id : null;
-
-    // 3.3. Idempotencia y Algoritmo de Conciliación Horaria (Prevención de Fraude)
-    if (event.type === 'geofenceEnter' && roundId) {
-      const existingEvent = await this.trackingEventRepository.findOne({
+      // 3. Buscar Ticket Diario Activo (para saber la Ruta) en la zona horaria local
+      const today = getLocalDateString(new Date(position.fixTime));
+      const ticket = await transactionalManager.findOne(DailyTicketEntity, {
         where: {
-          dailyTicketId: ticket.id,
-          roundId,
-          traccarGeofenceId: event.geofenceId,
-          eventType: 'geofenceEnter' as any
+          vehicleId: vehicle.id,
+          workDate: today as any,
+          status: TicketStatus.ACTIVE
         }
       });
+      if (!ticket) return;
 
-      if (existingEvent) {
-        const satTime = new Date(position.fixTime);
-        const pwaTime = existingEvent.serverTime;
-        const timeDiffMs = Math.abs(satTime.getTime() - pwaTime.getTime());
+      // 3.1. Obtener la vuelta activa
+      const activeRound = await transactionalManager.findOne(DailyRoundEntity, {
+        where: [
+          { dailyTicketId: ticket.id, status: RoundsStatus.IN_PROGRESS },
+          { dailyTicketId: ticket.id, status: RoundsStatus.PENDING }
+        ],
+        order: { roundNumber: 'DESC' }
+      });
+      const roundId = activeRound ? activeRound.id : null;
+      if (!roundId) return;
 
-        // Si la diferencia horaria es drástica (mayor a 3 minutos), rectificamos
-        if (timeDiffMs > 3 * 60 * 1000) {
-          existingEvent.serverTime = satTime;
-          existingEvent.rawPayload = {
-            ...existingEvent.rawPayload,
-            audit: {
-              rectifiedByTraccar: true,
-              originalPwaTime: pwaTime.toISOString(),
-              rectifiedTime: satTime.toISOString(),
-              desfaseMinutes: timeDiffMs / 60000
+      const eventTime = new Date(position.fixTime);
+
+      if (event.type === 'geofenceEnter') {
+        // CONCILIACIÓN JERÁRQUICA
+        const existingEvent = await transactionalManager.findOne(TrackingEventEntity, {
+          where: {
+            dailyTicketId: ticket.id,
+            roundId,
+            traccarGeofenceId: event.geofenceId,
+            eventType: 'geofenceEnter' as any
+          }
+        });
+
+        if (existingEvent) {
+          const source = existingEvent.rawPayload?.source;
+
+          if (source === 'PWA') {
+            // Caso B: El satélite llega después que la PWA. UPDATE con datos del satélite.
+            existingEvent.serverTime = eventTime;
+            existingEvent.latitude = position.latitude;
+            existingEvent.longitude = position.longitude;
+            existingEvent.rawPayload = {
+              ...payload,
+              source: 'TRACCAR',
+              audit: {
+                rectifiedByRealTimeWebhook: true,
+                originalPwaTime: existingEvent.serverTime.toISOString(),
+                rectifiedTime: eventTime.toISOString()
+              }
+            };
+            await transactionalManager.save(existingEvent);
+
+            // Convalidar infracción tentativa
+            if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId) {
+              await this.convalidateTentativeInfraction(
+                transactionalManager,
+                ticket,
+                routeStop,
+                eventTime,
+                roundId,
+                vehicle.tenantId
+              );
+            } else if (routeStop.type === GeofenceType.END && activeRound?.status === RoundsStatus.IN_PROGRESS) {
+              await this.autoCompleteRound(transactionalManager, activeRound, ticket, vehicle.id, eventTime);
             }
-          };
-          await this.trackingEventRepository.save(existingEvent);
+          }
+          // Si el source === 'TRACCAR', es un evento duplicado del satélite, lo ignoramos
+          return;
+        }
 
-          // Si es un checkpoint intermedio, recalcular e infraccionar si es necesario
-          if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId) {
-            await this.recalculateOfflineInfraction(
-              ticket,
-              routeStop,
-              satTime,
-              roundId,
-              vehicle.tenantId
+        // Caso A: No existe el evento. Es un ingreso regular detectado por satélite.
+        const trackingEvent = new TrackingEventEntity();
+        trackingEvent.tenantId = vehicle.tenantId;
+        trackingEvent.dailyTicketId = ticket.id;
+        trackingEvent.traccarGeofenceId = event.geofenceId;
+        trackingEvent.roundId = roundId;
+        trackingEvent.eventType = 'geofenceEnter' as any;
+        trackingEvent.serverTime = eventTime;
+        trackingEvent.latitude = position.latitude;
+        trackingEvent.longitude = position.longitude;
+        trackingEvent.durationSeconds = null;
+        trackingEvent.rawPayload = { ...payload, source: 'TRACCAR' }; // Marcado como origen TRACCAR
+
+        await transactionalManager.save(trackingEvent);
+
+        if (routeStop.type === GeofenceType.END && activeRound && activeRound.status === RoundsStatus.IN_PROGRESS) {
+          await this.autoCompleteRound(transactionalManager, activeRound, ticket, vehicle.id, eventTime);
+          return;
+        }
+
+        if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId && activeRound?.status === RoundsStatus.IN_PROGRESS) {
+          // Notificar en tiempo real al conductor
+          if (ticket.driverId) {
+            this.eventBus.publish(
+              new DriverNotificationSentEvent(ticket.driverId, {
+                id: randomUUID(),
+                type: 'CHECKPOINT_MARKED',
+                title: 'Control Marcado',
+                message: `Has ingresado a: ${routeStop.name || 'Punto de control'}`,
+                timestamp: new Date(),
+                data: {
+                  traccarGeofenceId: routeStop.traccarGeofenceId,
+                  stopOrder: routeStop.stopOrder,
+                },
+              }),
             );
           }
+
+          await this.handleCheckpoint(
+            transactionalManager,
+            ticket,
+            routeStop.traccarGeofenceId,
+            ticket.routeId,
+            eventTime,
+            vehicle.tenantId,
+            roundId
+          );
         }
-        
-        // Retornar (evitamos duplicar el registro)
-        return;
-      }
-    }
 
-    // 3.2. Si el evento es 'geofenceExit' (Salida de paradero), calcular el tiempo de estadía en segundos
-    let durationSeconds: number | null = null;
-    if (event.type === 'geofenceExit' && roundId) {
-      const lastEnterEvent = await this.trackingEventRepository.findOne({
-        where: {
-          roundId,
-          traccarGeofenceId: event.geofenceId,
-          eventType: 'geofenceEnter' as any // ENTER
-        },
-        order: { serverTime: 'DESC' }
-      });
-      if (lastEnterEvent) {
-        const exitTime = new Date(position.fixTime);
-        const enterTime = lastEnterEvent.serverTime;
-        const diffInMilliseconds = exitTime.getTime() - enterTime.getTime();
-        durationSeconds = Math.max(0, Math.round(diffInMilliseconds / 1000));
-      }
-    }
+      } else if (event.type === 'geofenceExit') {
+        // Procesar salida de geocerca de forma transaccional
+        const existingExit = await transactionalManager.findOne(TrackingEventEntity, {
+          where: {
+            dailyTicketId: ticket.id,
+            roundId,
+            traccarGeofenceId: event.geofenceId,
+            eventType: 'geofenceExit' as any
+          }
+        });
 
-    // 4. Registrar el Evento de Tracking (La Bitácora) con roundId y durationSeconds
-    const trackingEvent = new TrackingEventEntity();
-    trackingEvent.tenantId = vehicle.tenantId;
-    trackingEvent.dailyTicketId = ticket.id;
-    trackingEvent.traccarGeofenceId = event.geofenceId;
-    trackingEvent.roundId = roundId;
-    trackingEvent.eventType = event.type as any;
-    trackingEvent.serverTime = new Date(position.fixTime);
-    trackingEvent.latitude = position.latitude;
-    trackingEvent.longitude = position.longitude;
-    trackingEvent.durationSeconds = durationSeconds;
-    trackingEvent.rawPayload = payload;
-    await this.trackingEventRepository.save(trackingEvent);
-
-    // 5. Regla de Negocio: Solo procesamos ENTRADAS para penalidades
-    if (event.type !== 'geofenceEnter') return;
-
-    // 5.1. Si es paradero final (END) y la vuelta activa estaba IN_PROGRESS, completarla y generar vuelta de retorno en PENDING
-    if (routeStop.type === GeofenceType.END && activeRound && activeRound.status === RoundsStatus.IN_PROGRESS) {
-      await this.autoCompleteRound(activeRound, ticket, vehicle.id, new Date(position.fixTime));
-      return;
-    }
-
-    // 6. Si es paradero intermedio (CHECKPOINT), verificar retraso (solo si la vuelta está activa IN_PROGRESS)
-    if (routeStop.type === GeofenceType.CHECKPOINT && ticket.routeId && roundId && activeRound?.status === RoundsStatus.IN_PROGRESS) {
-      // Notificar en tiempo real al conductor que el control fue marcado exitosamente
-      if (ticket.driverId) {
-        this.eventBus.publish(
-          new DriverNotificationSentEvent(ticket.driverId, {
-            id: randomUUID(),
-            type: 'CHECKPOINT_MARKED',
-            title: 'Control Marcado',
-            message: `Has ingresado a: ${routeStop.name || 'Punto de control'}`,
-            timestamp: new Date(),
-            data: {
-              traccarGeofenceId: routeStop.traccarGeofenceId,
-              stopOrder: routeStop.stopOrder,
+        if (!existingExit) {
+          let durationSeconds: number | null = null;
+          const lastEnterEvent = await transactionalManager.findOne(TrackingEventEntity, {
+            where: {
+              roundId,
+              traccarGeofenceId: event.geofenceId,
+              eventType: 'geofenceEnter' as any
             },
-          }),
-        );
-      }
+            order: { serverTime: 'DESC' }
+          });
+          if (lastEnterEvent) {
+            const exitTime = new Date(position.fixTime);
+            const enterTime = lastEnterEvent.serverTime;
+            const diffInMilliseconds = exitTime.getTime() - enterTime.getTime();
+            durationSeconds = Math.max(0, Math.round(diffInMilliseconds / 1000));
+          }
 
-      await this.handleCheckpoint(
-        ticket, 
-        routeStop.traccarGeofenceId, 
-        ticket.routeId, 
-        trackingEvent.serverTime, 
-        vehicle.tenantId,
-        roundId
-      );
-    }
+          const trackingEvent = new TrackingEventEntity();
+          trackingEvent.tenantId = vehicle.tenantId;
+          trackingEvent.dailyTicketId = ticket.id;
+          trackingEvent.traccarGeofenceId = event.geofenceId;
+          trackingEvent.roundId = roundId;
+          trackingEvent.eventType = event.type as any;
+          trackingEvent.serverTime = eventTime;
+          trackingEvent.latitude = position.latitude;
+          trackingEvent.longitude = position.longitude;
+          trackingEvent.durationSeconds = durationSeconds;
+          trackingEvent.rawPayload = { ...payload, source: 'TRACCAR' };
+          
+          await transactionalManager.save(trackingEvent);
+        }
+      }
+    });
   }
 
   private async handleCheckpoint(
+    manager: EntityManager,
     ticket: DailyTicketEntity, 
     traccarGeofenceId: number, 
     routeId: string, 
@@ -209,19 +243,19 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     tenantId: string,
     roundId: string
   ) {
-    const routeStop = await this.routeStopRepository.findOne({
+    const routeStop = await manager.findOne(RouteStopEntity, {
       where: { routeId, traccarGeofenceId }
     });
     if (!routeStop) return;
 
-    const startStops = await this.routeStopRepository.find({
+    const startStops = await manager.find(RouteStopEntity, {
       where: { routeId, type: GeofenceType.START }
     });
     const startGeofenceIds = startStops.map(s => s.traccarGeofenceId);
     if (startGeofenceIds.length === 0) return;
 
-    // BÚSQUEDA OPTIMIZADA: Aislamiento por Vuelta (Evita cruces con viajes anteriores del mismo día)
-    const startEvent = await this.trackingEventRepository.findOne({
+    // BÚSQUEDA OPTIMIZADA: Aislamiento por Vuelta
+    const startEvent = await manager.findOne(TrackingEventEntity, {
       where: {
         roundId,
         eventType: 'geofenceEnter' as any,
@@ -243,14 +277,14 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
       infraction.roundId = roundId;
       infraction.type = InfractionType.RETRASO_RUTA;
       infraction.amount = 10.00;
-      infraction.status = InfractionStatus.PENDING;
+      infraction.status = InfractionStatus.PENDING; // Webhook directo es oficial (PENDING)
       
       const scheduledStr = getLocalTimeString(scheduledTime);
       const arrivalStr = getLocalTimeString(arrivalTime);
       
-      infraction.description = `Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
+      infraction.description = `[Satélite - Oficial] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
       
-      await this.infractionRepository.save(infraction);
+      await manager.save(infraction);
 
       if (ticket.driverId) {
         this.eventBus.publish(
@@ -272,21 +306,21 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     }
   }
 
-  private async recalculateOfflineInfraction(
+  private async convalidateTentativeInfraction(
+    manager: EntityManager,
     ticket: DailyTicketEntity,
     routeStop: RouteStopEntity,
-    satTime: Date,
+    arrivalTime: Date,
     roundId: string,
     tenantId: string
   ) {
-    const startStops = await this.routeStopRepository.find({
+    const startStops = await manager.find(RouteStopEntity, {
       where: { routeId: ticket.routeId as string, type: GeofenceType.START }
     });
     const startGeofenceIds = startStops.map(s => s.traccarGeofenceId);
     if (startGeofenceIds.length === 0) return;
 
-    // Buscar evento de salida de esa vuelta
-    const startEvent = await this.trackingEventRepository.findOne({
+    const startEvent = await manager.findOne(TrackingEventEntity, {
       where: {
         roundId,
         eventType: 'geofenceEnter' as any,
@@ -297,30 +331,46 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     if (!startEvent) return;
 
     const scheduledTime = new Date(startEvent.serverTime.getTime() + routeStop.minutesFromStart * 60000);
-    const delayMinutes = (satTime.getTime() - scheduledTime.getTime()) / 60000;
+    const delayMinutes = (arrivalTime.getTime() - scheduledTime.getTime()) / 60000;
 
-    // Buscar si ya existía una infracción preliminar creada por la sincronización de la PWA
-    const existingInfraction = await this.infractionRepository.findOne({
+    const scheduledStr = getLocalTimeString(scheduledTime);
+    const arrivalStr = getLocalTimeString(arrivalTime);
+
+    // Buscar si la PWA reportó una infracción tentative preliminar
+    const existingTentative = await manager.findOne(InfractionEntity, {
       where: {
         dailyTicketId: ticket.id,
         roundId,
         type: InfractionType.RETRASO_RUTA,
-        status: InfractionStatus.PENDING
+        status: InfractionStatus.TENTATIVE
       }
     });
 
     if (delayMinutes > 2) {
-      const scheduledStr = getLocalTimeString(scheduledTime);
-      const arrivalStr = getLocalTimeString(satTime);
-      const description = `[Rectificado por Satélite] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
+      const desc = `[Satélite - Convalidado] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
+      
+      if (existingTentative) {
+        existingTentative.status = InfractionStatus.PENDING;
+        existingTentative.description = desc;
+        await manager.save(existingTentative);
 
-      if (existingInfraction) {
-        // Actualizar la infracción preliminar con los datos oficiales
-        existingInfraction.description = description;
-        existingInfraction.amount = 10.00;
-        await this.infractionRepository.save(existingInfraction);
+        if (ticket.driverId) {
+          this.eventBus.publish(
+            new DriverNotificationSentEvent(ticket.driverId, {
+              id: randomUUID(),
+              type: 'INFRACTION',
+              title: 'Alerta de Infracción Convalidada',
+              message: desc,
+              timestamp: new Date(),
+              data: {
+                infractionId: existingTentative.id,
+                amount: existingTentative.amount,
+                delayMinutes: Math.round(delayMinutes),
+              },
+            })
+          );
+        }
       } else {
-        // Crear si no existía (por ejemplo, si el sync de la PWA falló pero el satélite reporta la multa)
         const infraction = new InfractionEntity();
         infraction.tenantId = tenantId;
         infraction.vehicleId = ticket.vehicleId;
@@ -330,40 +380,42 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
         infraction.type = InfractionType.RETRASO_RUTA;
         infraction.amount = 10.00;
         infraction.status = InfractionStatus.PENDING;
-        infraction.description = description;
-        await this.infractionRepository.save(infraction);
+        infraction.description = desc;
+        await manager.save(infraction);
       }
     } else {
-      // Si el satélite demuestra que llegó a tiempo, eliminamos la multa preliminar del front
-      if (existingInfraction) {
-        await this.infractionRepository.remove(existingInfraction);
+      // Satélite demuestra que llegó a tiempo, anulamos multa preliminar
+      if (existingTentative) {
+        existingTentative.status = InfractionStatus.ANNULLED;
+        existingTentative.cancellationReason = `Anulada tras convalidación en tiempo real por satélite. Tiempo de arribo oficial: ${arrivalStr}.`;
+        existingTentative.description = `[Satélite - Anulada] Cruce a tiempo verificado por satélite. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
+        await manager.save(existingTentative);
       }
     }
   }
 
   private async autoCompleteRound(
+    manager: EntityManager,
     activeRound: DailyRoundEntity,
     ticket: DailyTicketEntity,
     vehicleId: string,
     arrivalTime: Date
   ): Promise<void> {
-    // 1. Completar la vuelta actual
+    if (activeRound.status !== RoundsStatus.IN_PROGRESS) return;
+
     activeRound.status = RoundsStatus.COMPLETED;
     activeRound.endTime = arrivalTime;
-    await this.dailyRoundRepository.save(activeRound);
+    await manager.save(activeRound);
 
-    // 2. Determinar la dirección de retorno
     const nextDirection = activeRound.direction === 'IDA' ? 'VUELTA' : 'IDA';
 
-    // 3. Crear la siguiente vuelta en PENDING (sala de espera de retorno)
     const nextRound = new DailyRoundEntity();
     nextRound.dailyTicketId = ticket.id;
     nextRound.roundNumber = activeRound.roundNumber + 1;
     nextRound.direction = nextDirection;
     nextRound.status = RoundsStatus.PENDING;
-    await this.dailyRoundRepository.save(nextRound);
+    await manager.save(nextRound);
 
-    // 4. Actualizar la caché satelital en caliente
     await this.vehicleTenantCache.setDailyTicketId(vehicleId, ticket.id);
   }
 }

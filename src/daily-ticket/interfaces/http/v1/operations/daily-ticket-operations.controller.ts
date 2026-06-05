@@ -1,6 +1,6 @@
 import { Controller, Post, Param, UseGuards, PreconditionFailedException, NotFoundException, Logger, Body } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, EntityManager } from 'typeorm';
 import { JwtAuthGuard } from '@shared/infrastructure/guards/jwt-auth.guard';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { DailyRoundEntity, RoundsStatus } from '@daily-ticket/domain/entities/daily-round.entity';
@@ -160,17 +160,19 @@ export class DailyTicketOperationsController {
       throw new NotFoundException(`Ticket diario con ID ${ticketId} no encontrado.`);
     }
 
-    if (ticket.status === TicketStatus.CLOSED) {
+    const activeTicket = ticket;
+
+    if (activeTicket.status === TicketStatus.CLOSED) {
       throw new PreconditionFailedException('El ticket ya se encuentra cerrado.');
     }
 
     // Cerrar el ticket
-    ticket.status = TicketStatus.CLOSED;
-    await this.ticketRepository.save(ticket);
+    activeTicket.status = TicketStatus.CLOSED;
+    await this.ticketRepository.save(activeTicket);
 
     // Completar o cancelar cualquier vuelta abierta
-    if (ticket.rounds && ticket.rounds.length > 0) {
-      const activeRound = ticket.rounds.find(
+    if (activeTicket.rounds && activeTicket.rounds.length > 0) {
+      const activeRound = activeTicket.rounds.find(
         (r) => r.status === RoundsStatus.IN_PROGRESS || r.status === RoundsStatus.PENDING
       );
       if (activeRound) {
@@ -180,10 +182,19 @@ export class DailyTicketOperationsController {
       }
     }
 
-    // Remover el ticket activo de la caché satelital (estableciéndolo en null)
-    await this.vehicleTenantCache.setDailyTicketId(ticket.vehicleId, null);
+    // Anular infracciones TENTATIVE asociadas a este ticket en caliente
+    await this.infractionRepository.update(
+      { dailyTicketId: ticketId, status: InfractionStatus.TENTATIVE },
+      { 
+        status: InfractionStatus.ANNULLED,
+        cancellationReason: 'Anulada automáticamente al cerrar la jornada laboral (no convalidada por satélite).'
+      }
+    );
 
-    this.logger.log(`Jornada laboral del ticket ${ticketId} finalizada con éxito. Vehículo retirado de monitoreo.`);
+    // Remover el ticket activo de la caché satelital (estableciéndolo en null)
+    await this.vehicleTenantCache.setDailyTicketId(activeTicket.vehicleId, null);
+
+    this.logger.log(`Jornada laboral del ticket ${ticketId} finalizada con éxito. Vehículo retirado de monitoreo. Infracciones tentativas anuladas.`);
 
     return {
       success: true,
@@ -201,68 +212,78 @@ export class DailyTicketOperationsController {
     let synchronizedCount = 0;
     let ignoredCount = 0;
 
-    for (const cp of checkpoints) {
-      // 1. Verificar idempotencia: ¿ya existe este ingreso de geocerca para esta vuelta?
-      const existing = await this.trackingEventRepository.findOne({
-        where: {
-          dailyTicketId: cp.dailyTicketId,
-          roundId: cp.roundId,
-          traccarGeofenceId: cp.traccarGeofenceId,
-          eventType: 'geofenceEnter' as any
+    await this.ticketRepository.manager.transaction(async (transactionalManager) => {
+      for (const cp of checkpoints) {
+        // 1. Verificar idempotencia con jerarquía: ¿ya existe este ingreso de geocerca para esta vuelta?
+        const existing = await transactionalManager.findOne(TrackingEventEntity, {
+          where: {
+            dailyTicketId: cp.dailyTicketId,
+            roundId: cp.roundId,
+            traccarGeofenceId: cp.traccarGeofenceId,
+            eventType: 'geofenceEnter' as any
+          }
+        });
+
+        if (existing) {
+          const source = existing.rawPayload?.source;
+          if (source === 'TRACCAR') {
+            // El satélite ya oficializó el evento, bloquear reporte de PWA
+            ignoredCount++;
+            continue;
+          }
+          // Si es PWA, ya está insertado provisoriamente, omitimos
+          ignoredCount++;
+          continue;
         }
-      });
 
-      if (existing) {
-        ignoredCount++;
-        continue;
+        // 2. Buscar el paradero en route_stops para verificar el tipo
+        const routeStop = await transactionalManager.findOne(RouteStopEntity, {
+          where: { traccarGeofenceId: cp.traccarGeofenceId }
+        });
+
+        if (!routeStop) {
+          ignoredCount++;
+          continue;
+        }
+
+        // 3. Buscar el ticket para obtener datos del conductor y tenant
+        const ticket = await transactionalManager.findOne(DailyTicketEntity, {
+          where: { id: cp.dailyTicketId }
+        });
+
+        if (!ticket) {
+          ignoredCount++;
+          continue;
+        }
+
+        // 4. Registrar el Evento en la base de datos (Bitácora)
+        const trackingEvent = new TrackingEventEntity();
+        trackingEvent.tenantId = ticket.tenantId;
+        trackingEvent.dailyTicketId = ticket.id;
+        trackingEvent.traccarGeofenceId = cp.traccarGeofenceId;
+        trackingEvent.roundId = cp.roundId;
+        trackingEvent.eventType = 'geofenceEnter' as any;
+        trackingEvent.serverTime = new Date(cp.reachedAt); // la hora calculada con el offset monótono
+        trackingEvent.latitude = cp.latitude;
+        trackingEvent.longitude = cp.longitude;
+        trackingEvent.durationSeconds = null;
+        trackingEvent.rawPayload = { source: 'PWA' }; // Marcado con origen PWA
+
+        await transactionalManager.save(trackingEvent);
+        synchronizedCount++;
+
+        // 5. Si es paradero de tipo CHECKPOINT, validar el retraso de llegada
+        if (routeStop.type === ('CHECKPOINT' as any) && ticket.routeId) {
+          await this.handleOfflineCheckpointDelay(
+            transactionalManager,
+            ticket,
+            routeStop,
+            trackingEvent.serverTime,
+            cp.roundId
+          );
+        }
       }
-
-      // 2. Buscar el paradero en route_stops para verificar el tipo
-      const routeStop = await this.routeStopRepository.findOne({
-        where: { traccarGeofenceId: cp.traccarGeofenceId }
-      });
-
-      if (!routeStop) {
-        ignoredCount++;
-        continue;
-      }
-
-      // 3. Buscar el ticket para obtener datos del conductor y tenant
-      const ticket = await this.ticketRepository.findOne({
-        where: { id: cp.dailyTicketId }
-      });
-
-      if (!ticket) {
-        ignoredCount++;
-        continue;
-      }
-
-      // 4. Registrar el Evento en la base de datos (Bitácora)
-      const trackingEvent = new TrackingEventEntity();
-      trackingEvent.tenantId = ticket.tenantId;
-      trackingEvent.dailyTicketId = ticket.id;
-      trackingEvent.traccarGeofenceId = cp.traccarGeofenceId;
-      trackingEvent.roundId = cp.roundId;
-      trackingEvent.eventType = 'geofenceEnter' as any;
-      trackingEvent.serverTime = new Date(cp.reachedAt); // la hora en que el conductor cruzó en local
-      trackingEvent.latitude = cp.latitude;
-      trackingEvent.longitude = cp.longitude;
-      trackingEvent.durationSeconds = null;
-      trackingEvent.rawPayload = { source: 'frontend-offline-sync' };
-
-      await this.trackingEventRepository.save(trackingEvent);
-      synchronizedCount++;
-
-      // 5. Si es paradero de tipo CHECKPOINT, validar el retraso de llegada
-      if (routeStop.type === ('CHECKPOINT' as any) && ticket.routeId) {
-        await this.handleOfflineCheckpointDelay(
-          ticket,
-          routeStop,
-          trackingEvent.serverTime,
-          cp.roundId
-        );
-      }
-    }
+    });
 
     return {
       success: true,
@@ -275,20 +296,21 @@ export class DailyTicketOperationsController {
   }
 
   private async handleOfflineCheckpointDelay(
+    manager: EntityManager,
     ticket: DailyTicketEntity,
     routeStop: RouteStopEntity,
     arrivalTime: Date,
     roundId: string
   ) {
     // Buscar todas las geocercas tipo START de la ruta
-    const startStops = await this.routeStopRepository.find({
+    const startStops = await manager.find(RouteStopEntity, {
       where: { routeId: ticket.routeId as string, type: 'START' as any }
     });
     const startGeofenceIds = startStops.map(s => s.traccarGeofenceId);
     if (startGeofenceIds.length === 0) return;
 
     // Buscar el evento de salida/entrada inicial de esa vuelta específica
-    const startEvent = await this.trackingEventRepository.findOne({
+    const startEvent = await manager.findOne(TrackingEventEntity, {
       where: {
         roundId,
         eventType: 'geofenceEnter' as any,
@@ -303,7 +325,7 @@ export class DailyTicketOperationsController {
     const delayMinutes = (arrivalTime.getTime() - scheduledTime.getTime()) / 60000;
 
     if (delayMinutes > 2) {
-      // Registrar Infracción
+      // Registrar Infracción en estado TENTATIVE
       const infraction = new InfractionEntity();
       infraction.tenantId = ticket.tenantId;
       infraction.vehicleId = ticket.vehicleId;
@@ -312,14 +334,14 @@ export class DailyTicketOperationsController {
       infraction.roundId = roundId;
       infraction.type = InfractionType.RETRASO_RUTA;
       infraction.amount = 10.00;
-      infraction.status = InfractionStatus.PENDING;
+      infraction.status = InfractionStatus.TENTATIVE; // Guardar como TENTATIVE
 
       const scheduledStr = getLocalTimeString(scheduledTime);
       const arrivalStr = getLocalTimeString(arrivalTime);
 
-      infraction.description = `[Sincronización local] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
+      infraction.description = `[Sincronización local - TENTATIVA] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
 
-      await this.infractionRepository.save(infraction);
+      await manager.save(infraction);
 
       // Disparar evento reactivo de notificación al conductor
       if (ticket.driverId) {
@@ -327,7 +349,7 @@ export class DailyTicketOperationsController {
           new DriverNotificationSentEvent(ticket.driverId, {
             id: randomUUID(),
             type: 'INFRACTION',
-            title: 'Alerta de Infracción',
+            title: 'Alerta de Infracción Tentativa',
             message: infraction.description,
             timestamp: new Date(),
             data: {

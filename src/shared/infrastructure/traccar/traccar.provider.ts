@@ -263,6 +263,32 @@ export class TraccarProvider implements ITraccarProvider {
     }
   }
 
+  async getDeviceEvents(traccarDeviceId: number, from: Date, to: Date): Promise<Result<any[], Error>> {
+    const url = `${this.baseUrl}/api/reports/events?deviceId=${traccarDeviceId}&from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&type=geofenceEnter&type=geofenceExit`;
+    this.logger.log(`Obteniendo eventos de Traccar para dispositivo ID: ${traccarDeviceId} en rango [${from.toISOString()} - ${to.toISOString()}]`);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        this.logger.error(`Error de Traccar al obtener eventos para ID ${traccarDeviceId}: Estado ${response.status} - ${text}`);
+        return err(new Error(`Traccar API error [${response.status}]: ${text || 'Desconocido'}`));
+      }
+
+      const events = (await response.json()) as any[];
+      this.logger.log(`Obtenidos ${events.length} eventos para el dispositivo ID ${traccarDeviceId}`);
+      return ok(events);
+
+    } catch (error: any) {
+      this.logger.error(`Excepción crítica al obtener eventos en Traccar para ID ${traccarDeviceId}: ${error.message}`);
+      return err(new Error(`Excepción en conector Traccar: ${error.message}`));
+    }
+  }
+
   async updateDevice(id: number, device: TraccarDevice): Promise<Result<TraccarDevice, Error>> {
     const url = `${this.baseUrl}/api/devices/${id}`;
     this.logger.log(`Actualizando dispositivo en Traccar. ID: ${id}, Nombre: "${device.name}" (uniqueId: ${device.uniqueId})`);

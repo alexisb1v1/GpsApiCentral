@@ -76,6 +76,14 @@ export interface ITraccarProvider {
   getDevicePositions(traccarDeviceId: number, from: Date, to: Date): Promise<Result<any[], Error>>;
 
   /**
+   * Obtiene el historial de eventos de un dispositivo en un rango de fechas.
+   * @param traccarDeviceId - ID numérico del dispositivo en Traccar
+   * @param from - Fecha de inicio (UTC)
+   * @param to - Fecha de fin (UTC)
+   */
+  getDeviceEvents(traccarDeviceId: number, from: Date, to: Date): Promise<Result<any[], Error>>;
+
+  /**
    * Actualiza un dispositivo en el servidor de Traccar (ej: cambiar el groupId o el nombre).
    */
   updateDevice(id: number, device: TraccarDevice): Promise<Result<TraccarDevice, Error>>;

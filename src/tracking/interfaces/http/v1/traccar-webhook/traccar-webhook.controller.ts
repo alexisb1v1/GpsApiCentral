@@ -3,6 +3,7 @@ import { CommandBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TraccarWebhookRequestDto } from './dto/traccar-webhook.request.dto';
 import { ProcessTraccarWebhookCommand } from '@tracking/application/commands/v1/process-traccar-webhook/process-traccar-webhook.command';
+import { ConciliateOfflineEventsCommand } from '@tracking/application/commands/v1/conciliate-offline-events/conciliate-offline-events.command';
 import { Public } from '@shared/infrastructure/decorators/public.decorator';
 
 @ApiTags('Tracking Webhooks')
@@ -40,17 +41,28 @@ export class TraccarWebhookController {
     const geofenceId = payload.event?.geofenceId;
 
     console.log(
-      `[Webhook Traccar] 📥 Evento procesado -> Tipo: ${eventType}, Dispositivo: ${deviceId} (IMEI: ${uniqueId}), Geocerca: ${geofenceId}`
+      `[Webhook Traccar] 📥 Evento recibido -> Tipo: ${eventType}, Dispositivo: ${deviceId} (IMEI: ${uniqueId}), Geocerca: ${geofenceId}`
     );
 
-    // Procesar únicamente si es entrada o salida de geocerca
+    // Procesar según tipo de evento
     if (eventType === 'geofenceEnter' || eventType === 'geofenceExit') {
-      // Procesamiento asíncrono vía CQRS
+      // Procesamiento asíncrono vía CQRS para geocercas
       await this.commandBus.execute(
         new ProcessTraccarWebhookCommand(payload),
       );
+    } else if (eventType === 'deviceOnline') {
+      // Reconexión satelital de red, gatillar conciliación
+      if (deviceId) {
+        this.logger.log(`[Webhook Traccar] Dispositivo ID ${deviceId} en línea (deviceOnline). Iniciando conciliación de eventos...`);
+        // Se ejecuta en segundo plano o asíncronamente
+        this.commandBus.execute(
+          new ConciliateOfflineEventsCommand(deviceId)
+        ).catch(err => {
+          this.logger.error(`[Webhook Traccar] Error al ejecutar ConciliateOfflineEventsCommand para dispositivo ${deviceId}: ${err.message}`);
+        });
+      }
     } else {
-      console.log(`[Webhook Traccar] ℹ️ Evento '${eventType}' ignorado (no es entrada/salida de geocerca).`);
+      console.log(`[Webhook Traccar] ℹ️ Evento '${eventType}' ignorado.`);
     }
     
     return { success: true };

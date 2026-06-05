@@ -11,6 +11,7 @@ export enum InfractionType {
 }
 
 export enum InfractionStatus {
+  TENTATIVE = 'TENTATIVE',
   PENDING = 'PENDING',
   PAID = 'PAID',
   ANNULLED = 'ANNULLED',

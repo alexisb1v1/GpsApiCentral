@@ -533,6 +533,21 @@ export class VehicleTenantCache implements OnModuleInit {
       }
     }
 
+    // Anular infracciones TENTATIVE residuales de días anteriores de forma masiva
+    try {
+      this.logger.log(`[Cache - Fin de Día] Anulando infracciones tentativas residuales de días anteriores...`);
+      const updateResult = await this.infractionRepository.update(
+        { status: InfractionStatus.TENTATIVE },
+        { 
+          status: InfractionStatus.ANNULLED,
+          cancellationReason: 'Anulada automáticamente en el reinicio de jornada del sistema (no convalidada por satélite).'
+        }
+      );
+      this.logger.log(`[Cache - Fin de Día] Infracciones tentativas residuales anuladas: ${updateResult.affected ?? 0}`);
+    } catch (err: any) {
+      this.logger.error(`[Cache - Fin de Día] Error al anular infracciones tentativas residuales: ${err.message}`);
+    }
+
     this.preloadPromise = null;
     await this.preloadCache();
   }
