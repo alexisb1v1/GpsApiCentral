@@ -16,6 +16,8 @@ import { InfractionEntity, InfractionType, InfractionStatus } from '@infraction/
 import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 import { RoundsStatus } from '@daily-ticket/domain/entities/daily-round.entity';
 import { getLocalDateString, getLocalTimeString } from '@shared/utils/date.util';
+import { ROUTE_DELAY_TOLERANCE_MINUTES } from '@shared/domain/constants/business.constants';
+
 
 
 export enum GeofenceType {
@@ -266,7 +268,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     const scheduledTime = new Date(startEvent.serverTime.getTime() + routeStop.minutesFromStart * 60000);
     const delayMinutes = (arrivalTime.getTime() - scheduledTime.getTime()) / 60000;
 
-    if (delayMinutes > 2) {
+    if (delayMinutes > ROUTE_DELAY_TOLERANCE_MINUTES) {
       const infraction = new InfractionEntity();
       infraction.tenantId = tenantId;
       infraction.vehicleId = ticket.vehicleId;
@@ -344,7 +346,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
       }
     });
 
-    if (delayMinutes > 2) {
+    if (delayMinutes > ROUTE_DELAY_TOLERANCE_MINUTES) {
       const desc = `[Satélite - Convalidado] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
       
       if (existingTentative) {

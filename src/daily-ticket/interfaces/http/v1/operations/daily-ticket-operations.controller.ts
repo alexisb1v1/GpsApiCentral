@@ -12,6 +12,8 @@ import { EventBus } from '@nestjs/cqrs';
 import { DriverNotificationSentEvent } from '@monitoring/domain/events/driver-notification-sent.event';
 import { randomUUID } from 'crypto';
 import { getLocalTimeString } from '@shared/utils/date.util';
+import { ROUTE_DELAY_TOLERANCE_MINUTES } from '@shared/domain/constants/business.constants';
+
 
 
 export class SyncOfflineCheckpointDto {
@@ -280,6 +282,27 @@ export class DailyTicketOperationsController {
             trackingEvent.serverTime,
             cp.roundId
           );
+        } else if (routeStop.type === ('END' as any)) {
+          // Si el paradero es de tipo END, autocompletar la vuelta activa
+          const activeRound = await transactionalManager.findOne(DailyRoundEntity, {
+            where: { id: cp.roundId, status: RoundsStatus.IN_PROGRESS }
+          });
+          if (activeRound) {
+            activeRound.status = RoundsStatus.COMPLETED;
+            activeRound.endTime = trackingEvent.serverTime;
+            await transactionalManager.save(activeRound);
+
+            const nextDirection = activeRound.direction === 'IDA' ? 'VUELTA' : 'IDA';
+            const nextRound = new DailyRoundEntity();
+            nextRound.dailyTicketId = ticket.id;
+            nextRound.roundNumber = activeRound.roundNumber + 1;
+            nextRound.direction = nextDirection;
+            nextRound.status = RoundsStatus.PENDING;
+            await transactionalManager.save(nextRound);
+
+            await this.vehicleTenantCache.setDailyTicketId(ticket.vehicleId, ticket.id);
+            this.logger.log(`Vuelta offline ${activeRound.id} completada automáticamente al sincronizar paradero final. Siguiente vuelta creada.`);
+          }
         }
       }
     });
@@ -323,7 +346,7 @@ export class DailyTicketOperationsController {
     const scheduledTime = new Date(startEvent.serverTime.getTime() + routeStop.minutesFromStart * 60000);
     const delayMinutes = (arrivalTime.getTime() - scheduledTime.getTime()) / 60000;
 
-    if (delayMinutes > 2) {
+    if (delayMinutes > ROUTE_DELAY_TOLERANCE_MINUTES) {
       // Registrar Infracción en estado TENTATIVE
       const infraction = new InfractionEntity();
       infraction.tenantId = ticket.tenantId;

@@ -15,6 +15,8 @@ import { getLocalDateString, getLocalTimeString } from '@shared/utils/date.util'
 import { DriverNotificationSentEvent } from '@monitoring/domain/events/driver-notification-sent.event';
 import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 import { randomUUID } from 'crypto';
+import { ROUTE_DELAY_TOLERANCE_MINUTES } from '@shared/domain/constants/business.constants';
+
 
 @CommandHandler(ConciliateOfflineEventsCommand)
 export class ConciliateOfflineEventsHandler implements ICommandHandler<ConciliateOfflineEventsCommand> {
@@ -275,7 +277,7 @@ export class ConciliateOfflineEventsHandler implements ICommandHandler<Conciliat
     const scheduledTime = new Date(startEvent.serverTime.getTime() + routeStop.minutesFromStart * 60000);
     const delayMinutes = (arrivalTime.getTime() - scheduledTime.getTime()) / 60000;
 
-    if (delayMinutes > 2) {
+    if (delayMinutes > ROUTE_DELAY_TOLERANCE_MINUTES) {
       // Infracción oficial de satélite va directo a PENDING
       const infraction = new InfractionEntity();
       infraction.tenantId = tenantId;
@@ -352,7 +354,7 @@ export class ConciliateOfflineEventsHandler implements ICommandHandler<Conciliat
       }
     });
 
-    if (delayMinutes > 2) {
+    if (delayMinutes > ROUTE_DELAY_TOLERANCE_MINUTES) {
       const desc = `[Satélite - Convalidado] Retraso de ${Math.round(delayMinutes)} min en paradero ${routeStop.name || routeStop.id}. Programado: ${scheduledStr}, Real: ${arrivalStr}`;
       
       if (existingTentative) {
