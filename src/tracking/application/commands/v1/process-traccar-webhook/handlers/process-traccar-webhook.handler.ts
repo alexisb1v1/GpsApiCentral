@@ -141,7 +141,6 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
 
         // Caso A: No existe el evento. Es un ingreso regular detectado por satélite.
         const trackingEvent = new TrackingEventEntity();
-        trackingEvent.tenantId = vehicle.tenantId;
         trackingEvent.dailyTicketId = ticket.id;
         trackingEvent.traccarGeofenceId = event.geofenceId;
         trackingEvent.roundId = roundId;
@@ -217,7 +216,6 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
           }
 
           const trackingEvent = new TrackingEventEntity();
-          trackingEvent.tenantId = vehicle.tenantId;
           trackingEvent.dailyTicketId = ticket.id;
           trackingEvent.traccarGeofenceId = event.geofenceId;
           trackingEvent.roundId = roundId;

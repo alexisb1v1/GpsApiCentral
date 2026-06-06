@@ -12,9 +12,6 @@ export class TrackingEventEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'tenant_id', type: 'uuid' })
-  tenantId: string;
-
   @Column({ name: 'daily_ticket_id', type: 'uuid' })
   dailyTicketId: string;
 

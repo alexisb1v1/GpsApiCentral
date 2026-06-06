@@ -258,7 +258,6 @@ export class DailyTicketOperationsController {
 
         // 4. Registrar el Evento en la base de datos (Bitácora)
         const trackingEvent = new TrackingEventEntity();
-        trackingEvent.tenantId = ticket.tenantId;
         trackingEvent.dailyTicketId = ticket.id;
         trackingEvent.traccarGeofenceId = cp.traccarGeofenceId;
         trackingEvent.roundId = cp.roundId;

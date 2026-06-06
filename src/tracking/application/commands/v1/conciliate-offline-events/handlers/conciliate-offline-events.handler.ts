@@ -141,7 +141,6 @@ export class ConciliateOfflineEventsHandler implements ICommandHandler<Conciliat
             // Caso A: No existe el evento. El satélite lo detectó pero la PWA no lo reportó.
             // Lo insertamos como origen satélite
             const trackingEvent = new TrackingEventEntity();
-            trackingEvent.tenantId = vehicle.tenantId;
             trackingEvent.dailyTicketId = ticket.id;
             trackingEvent.traccarGeofenceId = geofenceId;
             trackingEvent.roundId = roundId;
@@ -230,7 +229,6 @@ export class ConciliateOfflineEventsHandler implements ICommandHandler<Conciliat
             }
 
             const trackingEvent = new TrackingEventEntity();
-            trackingEvent.tenantId = vehicle.tenantId;
             trackingEvent.dailyTicketId = ticket.id;
             trackingEvent.traccarGeofenceId = geofenceId;
             trackingEvent.roundId = roundId;
