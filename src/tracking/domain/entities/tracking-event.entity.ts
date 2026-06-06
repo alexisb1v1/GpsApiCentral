@@ -22,6 +22,7 @@ export class TrackingEventEntity {
   roundId: string | null;
 
   @Column({
+    name: 'event_type',
     type: 'enum',
     enum: TrackingEventType,
   })
