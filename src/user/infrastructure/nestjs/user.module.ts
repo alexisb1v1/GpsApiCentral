@@ -19,6 +19,7 @@ import { ResetPasswordHandler } from '@user/application/commands/v1/reset-passwo
 import { ChangePasswordHandler } from '@user/application/commands/v1/change-password/handlers/change-password.handler';
 import { GetUserByIdHandler } from '@user/application/queries/v1/get-user-by-id/handlers/get-user-by-id.handler';
 import { GetUsersByTenantHandler } from '@user/application/queries/v1/get-users-by-tenant/handlers/get-users-by-tenant.handler';
+import { RefreshTokenHandler } from '@user/application/commands/v1/refresh-token/handlers/refresh-token.handler';
 
 // Controllers
 import { CreateUserController } from '@user/interfaces/http/v1/create-user/create-user.controller';
@@ -39,6 +40,7 @@ const Handlers = [
   ChangePasswordHandler,
   GetUserByIdHandler,
   GetUsersByTenantHandler,
+  RefreshTokenHandler,
 ];
 
 const Repositories = [

@@ -5,5 +5,6 @@ export class LoginCommand {
     public readonly tenant: string,
     public readonly ipAddress?: string,
     public readonly userAgent?: string,
+    public readonly deviceFingerprint?: string,
   ) {}
 }

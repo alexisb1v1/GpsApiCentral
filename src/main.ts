@@ -52,15 +52,19 @@ async function bootstrap() {
   // Prefijo global
   app.setGlobalPrefix('api');
 
-  // Swagger Configuration
-  const config = new DocumentBuilder()
-    .setTitle('GpsApiCentral')
-    .setDescription('API Central para la gestión de dispositivos GPS')
-    .setVersion('1.0')
-    .addBearerAuth() // Añadimos soporte para JWT en Swagger
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
+  // Swagger Configuration - Ocultar en producción a menos que SHOW_SWAGGER sea 'true'
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const showSwagger = process.env.SHOW_SWAGGER === 'true';
+  if (isDevelopment || showSwagger) {
+    const config = new DocumentBuilder()
+      .setTitle('GpsApiCentral')
+      .setDescription('API Central para la gestión de dispositivos GPS')
+      .setVersion('1.0')
+      .addBearerAuth() // Añadimos soporte para JWT en Swagger
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('docs', app, document);
+  }
 
   // Filtro global de excepciones
   app.useGlobalFilters(new GlobalExceptionFilter());

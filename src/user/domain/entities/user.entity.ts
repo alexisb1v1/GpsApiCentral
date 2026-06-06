@@ -33,6 +33,15 @@ export class UserEntity {
   @OneToOne(() => DriverInfoEntity, (driverInfo) => driverInfo.user, { cascade: true })
   driverInfo: DriverInfoEntity;
 
+  @Column({ name: 'refresh_token', type: 'varchar', length: 255, nullable: true })
+  refreshToken: string | null;
+
+  @Column({ name: 'refresh_token_expires_at', type: 'timestamptz', nullable: true })
+  refreshTokenExpiresAt: Date | null;
+
+  @Column({ name: 'refresh_token_fingerprint', type: 'varchar', length: 255, nullable: true })
+  refreshTokenFingerprint: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

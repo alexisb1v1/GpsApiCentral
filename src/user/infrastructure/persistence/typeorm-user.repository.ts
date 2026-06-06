@@ -94,4 +94,17 @@ export class TypeOrmUserRepository implements UserRepository {
       return err('INTERNAL_ERROR');
     }
   }
+
+  async findByRefreshToken(refreshToken: string): Promise<Result<UserEntity, AppError>> {
+    try {
+      const user = await this.repository.findOne({
+        where: { refreshToken },
+        relations: ['driverInfo'],
+      });
+      if (!user) return err('NOT_FOUND');
+      return ok(user);
+    } catch (error) {
+      return err('INTERNAL_ERROR');
+    }
+  }
 }

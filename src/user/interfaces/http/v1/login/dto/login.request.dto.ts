@@ -16,6 +16,10 @@ export class LoginRequestDto {
   @IsString()
   @IsNotEmpty()
   tenant: string;
+
+  @ApiProperty({ example: 'a9b8c7d6...', required: false })
+  @IsString()
+  deviceFingerprint?: string;
 }
 
 export class UserResponseDto {
@@ -38,4 +42,27 @@ export class LoginResponseDto {
 
   @ApiProperty()
   token: string;
+
+  @ApiProperty({ nullable: true })
+  refreshToken: string | null;
+}
+
+export class RefreshTokenRequestDto {
+  @ApiProperty({ example: 'abcdef...' })
+  @IsString()
+  @IsNotEmpty()
+  refreshToken: string;
+
+  @ApiProperty({ example: 'a9b8c7d6...' })
+  @IsString()
+  @IsNotEmpty()
+  deviceFingerprint: string;
+}
+
+export class RefreshTokenResponseDto {
+  @ApiProperty()
+  token: string;
+
+  @ApiProperty()
+  refreshToken: string;
 }

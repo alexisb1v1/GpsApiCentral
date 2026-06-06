@@ -3,6 +3,7 @@ import { Result, ok, err } from 'neverthrow';
 import { Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { LoginCommand } from '../login.command';
 import { UserRepository } from '@user/domain/repositories/user.repository';
 import { TenantRepository } from '@tenant/domain/repositories/tenant.repository';
@@ -21,7 +22,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     private readonly auditService: AuditService,
   ) {}
 
-  async execute(command: LoginCommand): Promise<Result<{ user: { id: string; email: string; name: string }; token: string }, AppError>> {
+  async execute(command: LoginCommand): Promise<Result<{ user: { id: string; email: string; name: string; tenantId: string | null; role: string }; token: string; refreshToken: string | null }, AppError>> {
     // 0. Buscar tenant por subdominio
     const tenantResult = await this.tenantRepository.findBySubdomain(command.tenant);
     if (tenantResult.isErr()) return err('UNAUTHORIZED');
@@ -43,7 +44,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     const isPasswordValid = await bcrypt.compare(command.password, user.password);
     if (!isPasswordValid) return err('UNAUTHORIZED');
 
-    // 4. Generar Payload
+    // 4. Generar Payload para Access Token (jwt corto)
     const payload = { 
       sub: user.id, 
       email: user.email, 
@@ -52,6 +53,21 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     };
 
     const token = this.jwtService.sign(payload);
+
+    // Generar y almacenar Refresh Token si hay device fingerprint
+    let refreshToken: string | null = null;
+    if (command.deviceFingerprint) {
+      refreshToken = randomBytes(64).toString('hex');
+      const refreshTokenExpiresAt = new Date();
+      refreshTokenExpiresAt.setDate(refreshTokenExpiresAt.getDate() + 7); // 7 días
+
+      user.refreshToken = refreshToken;
+      user.refreshTokenExpiresAt = refreshTokenExpiresAt;
+      user.refreshTokenFingerprint = command.deviceFingerprint;
+
+      const saveResult = await this.userRepository.save(user);
+      if (saveResult.isErr()) return err('INTERNAL_ERROR');
+    }
 
     // 5. Registrar en auditoría
     this.auditService.createLog({
@@ -74,6 +90,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
         role: user.role,
       },
       token: token,
+      refreshToken: refreshToken,
     });
   }
 }
