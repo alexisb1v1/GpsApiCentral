@@ -211,7 +211,7 @@ export class CreateDailyTicketHandler implements ICommandHandler<CreateDailyTick
       await queryRunner.commitTransaction();
 
       // H. Operaciones posteriores no bloqueantes
-      this.vehicleTenantCache.setDailyTicketId(savedTicket.vehicleId, savedTicket.id);
+      await this.vehicleTenantCache.setDailyTicketId(savedTicket.vehicleId, savedTicket.id);
 
       // Sincronizar en Traccar: Vincular el vehículo al grupo de la ruta
       if (vehicle.traccarId && route && route.traccarGroupId && vehicle.traccarDeviceId) {

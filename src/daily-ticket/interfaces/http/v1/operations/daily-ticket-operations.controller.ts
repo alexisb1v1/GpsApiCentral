@@ -13,6 +13,7 @@ import { DriverNotificationSentEvent } from '@monitoring/domain/events/driver-no
 import { randomUUID } from 'crypto';
 import { getLocalTimeString } from '@shared/utils/date.util';
 import { ROUTE_DELAY_TOLERANCE_MINUTES } from '@shared/domain/constants/business.constants';
+import { RoundCompletedEvent } from '@tracking/domain/events/round-completed.event';
 
 
 
@@ -125,6 +126,7 @@ export class DailyTicketOperationsController {
     round.status = RoundsStatus.COMPLETED;
     round.endTime = new Date();
     await this.roundRepository.save(round);
+    this.eventBus.publish(new RoundCompletedEvent(round.id));
 
     // Auto-generar la siguiente vuelta en PENDING
     const nextDirection = round.direction === 'IDA' ? 'VUELTA' : 'IDA';
@@ -181,6 +183,7 @@ export class DailyTicketOperationsController {
         activeRound.status = RoundsStatus.COMPLETED;
         activeRound.endTime = new Date();
         await this.roundRepository.save(activeRound);
+        this.eventBus.publish(new RoundCompletedEvent(activeRound.id));
       }
     }
 
@@ -291,6 +294,7 @@ export class DailyTicketOperationsController {
             activeRound.status = RoundsStatus.COMPLETED;
             activeRound.endTime = trackingEvent.serverTime;
             await transactionalManager.save(activeRound);
+            this.eventBus.publish(new RoundCompletedEvent(activeRound.id));
 
             const nextDirection = activeRound.direction === 'IDA' ? 'VUELTA' : 'IDA';
             const nextRound = new DailyRoundEntity();

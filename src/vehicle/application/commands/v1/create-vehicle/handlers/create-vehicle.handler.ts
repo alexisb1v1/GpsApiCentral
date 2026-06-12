@@ -72,7 +72,7 @@ export class CreateVehicleHandler implements ICommandHandler<CreateVehicleComman
 
     if (saveResult.isOk()) {
       if (traccarId) {
-        this.vehicleTenantCache.setVehicleState(traccarId, {
+        await this.vehicleTenantCache.setVehicleState(traccarId, {
           vehicleId: saveResult.value.id,
           tenantId: saveResult.value.tenantId,
           dailyTicketId: null,

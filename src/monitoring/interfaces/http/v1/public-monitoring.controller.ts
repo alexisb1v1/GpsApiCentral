@@ -69,7 +69,7 @@ export class PublicMonitoringController {
     });
 
     // 4. Obtener las coordenadas del posicionamiento en tiempo real desde la caché
-    const allPositions = this.vehicleTenantCache.getLatestPositionsByTenant(tenant.id);
+    const allPositions = await this.vehicleTenantCache.getLatestPositionsByTenant(tenant.id);
 
     // 5. Filtrar estrictamente: solo vehículos con tickets del día activos y pagados (dailyTicketId no nulo)
     const activeVehicles = allPositions.filter(pos => pos.dailyTicketId !== null);

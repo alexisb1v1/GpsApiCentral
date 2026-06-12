@@ -43,7 +43,7 @@ export class UpdateVehicleStatusHandler implements ICommandHandler<UpdateVehicle
       vehicle.traccarId = null;
       vehicle.traccarDeviceId = null;
       if (oldTraccarId) {
-        this.vehicleTenantCache.removeVehicleState(oldTraccarId, vehicle.id);
+        await this.vehicleTenantCache.removeVehicleState(oldTraccarId, vehicle.id);
         await this.traccarProvider.deleteDevice(oldTraccarId);
       }
     } else if ((command.status === VehicleStatus.OPERATIVO || command.status === VehicleStatus.TALLER) && oldStatus === VehicleStatus.BAJA) {
@@ -70,7 +70,7 @@ export class UpdateVehicleStatusHandler implements ICommandHandler<UpdateVehicle
       
       // Sincronizar en caliente la caché si está activo y tiene traccarId
       if (savedVehicle.status !== VehicleStatus.BAJA && savedVehicle.traccarId) {
-        this.vehicleTenantCache.setVehicleState(savedVehicle.traccarId, {
+        await this.vehicleTenantCache.setVehicleState(savedVehicle.traccarId, {
           vehicleId: savedVehicle.id,
           tenantId: savedVehicle.tenantId,
           dailyTicketId: null,

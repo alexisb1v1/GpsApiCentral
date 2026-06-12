@@ -45,7 +45,7 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
       traccarId = null;
       vehicle.traccarDeviceId = null;
       if (oldValues.traccarId) {
-        this.vehicleTenantCache.removeVehicleState(oldValues.traccarId, vehicle.id);
+        await this.vehicleTenantCache.removeVehicleState(oldValues.traccarId, vehicle.id);
         await this.traccarProvider.deleteDevice(oldValues.traccarId);
       }
     } else if (newTraccarId !== vehicle.traccarDeviceId || (isReactivating && newTraccarId)) {
@@ -98,7 +98,7 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
     if (saveResult.isOk()) {
       // Si el traccarId anterior era diferente, remover la clave vieja de la caché
       if (oldValues.traccarId && oldValues.traccarId !== vehicle.traccarId) {
-        this.vehicleTenantCache.removeVehicleState(oldValues.traccarId, oldValues.id);
+        await this.vehicleTenantCache.removeVehicleState(oldValues.traccarId, oldValues.id);
       }
 
       if (vehicle.traccarId) {
@@ -109,7 +109,7 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
         let currentRouteId: string | null = null;
         let currentDirection: 'IDA' | 'VUELTA' | null = null;
 
-        const existingState = this.vehicleTenantCache.getVehicleState(vehicle.traccarId);
+        const existingState = await this.vehicleTenantCache.getVehicleState(vehicle.traccarId);
         if (existingState) {
           currentTicketId = existingState.dailyTicketId;
           currentDriverName = existingState.driverName || 'No asignado';
@@ -118,7 +118,7 @@ export class UpdateVehicleHandler implements ICommandHandler<UpdateVehicleComman
           currentDirection = existingState.direction;
         }
 
-        this.vehicleTenantCache.setVehicleState(vehicle.traccarId, {
+        await this.vehicleTenantCache.setVehicleState(vehicle.traccarId, {
           vehicleId: vehicle.id,
           tenantId: vehicle.tenantId,
           dailyTicketId: currentTicketId,

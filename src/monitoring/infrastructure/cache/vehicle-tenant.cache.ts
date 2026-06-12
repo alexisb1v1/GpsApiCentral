@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Subject } from 'rxjs';
+import { Redis } from 'ioredis';
 import { VehicleEntity } from '@vehicle/domain/entities/vehicle.entity';
 import { DailyTicketEntity, TicketStatus } from '@daily-ticket/domain/entities/daily-ticket.entity';
 import { TenantEntity } from '@tenant/domain/entities/tenant.entity';
@@ -12,19 +13,18 @@ import { InfractionEntity, InfractionStatus } from '../../../infraction/domain/e
 import { ITraccarProvider } from '@shared/infrastructure/traccar/traccar-provider.interface';
 import { getLocalDateString } from '@shared/utils/date.util';
 
-
 export interface CachedVehicleState {
   vehicleId: string;
   tenantId: string;
-  tenantName?: string; // Opcional, para el visor legible
-  dailyTicketId: string | null; // UUID del ticket si pagó hoy, o null si no
+  tenantName?: string;
+  dailyTicketId: string | null;
   plate: string;
   driverName: string | null;
-  driverId: string | null; // ID del conductor
-  routeId: string | null; // ID de la ruta asignada
-  routeName?: string; // Opcional, para el visor legible
-  direction: 'IDA' | 'VUELTA' | null; // Dirección activa de la ruta
-  lastPosition?: any; // Última posición conocida reportada por Traccar
+  driverId: string | null;
+  routeId: string | null;
+  routeName?: string;
+  direction: 'IDA' | 'VUELTA' | null;
+  lastPosition?: any;
   roundId?: string | null;
   roundStatus?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | null;
   hasPendingInfractions?: boolean;
@@ -34,19 +34,16 @@ export interface CachedVehicleState {
 export class VehicleTenantCache implements OnModuleInit {
   private readonly logger = new Logger(VehicleTenantCache.name);
   
-  // Stream de actualizaciones en caliente para componentes reactivos (como WebSockets)
+  // Stream de actualizaciones en caliente para componentes reactivos (WebSockets)
   public readonly cacheUpdates$ = new Subject<{ vehicleId: string; state: CachedVehicleState; previousDriverId?: string | null }>();
   
-  // Mapa en memoria: traccarDeviceId (número) -> CachedVehicleState
-  private readonly cache = new Map<number, CachedVehicleState>();
-  
-  // Mapa inverso para actualizaciones rápidas por vehicleId (string) -> traccarDeviceId (number)
-  private readonly vehicleIdToTraccarId = new Map<string, number>();
+  // Caché rápida en RAM local únicamente para mapear tenantId -> tenantSlug
+  private readonly tenantIdToSlug = new Map<string, string>();
+  private readonly tenantSlugToId = new Map<string, string>();
 
   private preloadPromise: Promise<void> | null = null;
   private lastLoadDate: string | null = null;
   private midnightTimeout: NodeJS.Timeout | null = null;
-
 
   constructor(
     @InjectRepository(VehicleEntity)
@@ -64,6 +61,8 @@ export class VehicleTenantCache implements OnModuleInit {
     private readonly configService: ConfigService,
     @Inject('ITraccarProvider')
     private readonly traccarProvider: ITraccarProvider,
+    @Inject('REDIS_CLIENT')
+    private readonly redis: Redis,
   ) {}
 
   async onModuleInit() {
@@ -72,43 +71,61 @@ export class VehicleTenantCache implements OnModuleInit {
   }
 
   /**
-   * Precarga en memoria toda la información de vehículos y sus tickets diarios activos del día.
+   * Precarga en Redis toda la información de vehículos y sus tickets diarios activos del día.
    */
   async preloadCache(): Promise<void> {
     if (this.preloadPromise) return this.preloadPromise;
 
     this.preloadPromise = (async () => {
       try {
-        this.logger.log('Iniciando precarga de caché de vehículos y tickets diarios...');
+        this.logger.log('[Cache Redis] Iniciando precarga de caché de vehículos y tickets diarios en Redis...');
         
-        // Guardar posiciones GPS conocidas antes de limpiar para no perder la localización en caliente
-        const savedPositions = new Map<number, any>();
-        for (const [traccarId, state] of this.cache.entries()) {
-          if (state.lastPosition) {
-            savedPositions.set(traccarId, state.lastPosition);
-          }
-        }
-
-        this.cache.clear();
-        this.vehicleIdToTraccarId.clear();
-
-        // Cargar mapas de nombres legibles para cooperativas y rutas
+        // Cargar mapas locales en RAM de Tenants para enrutamiento rápido
         const tenantsList = await this.tenantRepository.find();
+        this.tenantIdToSlug.clear();
+        this.tenantSlugToId.clear();
         const tenantMap = new Map<string, string>();
+        
         for (const t of tenantsList) {
+          this.tenantIdToSlug.set(t.id, t.subdomain);
+          this.tenantSlugToId.set(t.subdomain, t.id);
           tenantMap.set(t.id, t.name);
         }
 
+        // Recuperar posiciones GPS en caliente de los Hashes de Redis existentes para no perderlas tras reiniciar
+        const savedPositions = new Map<number, any>();
+        for (const t of tenantsList) {
+          const tenantSlug = t.subdomain;
+          const posMap = await this.redis.hgetall(`${tenantSlug}_cache_vehiculos`);
+          for (const [traccarIdStr, posJson] of Object.entries(posMap)) {
+            try {
+              savedPositions.set(parseInt(traccarIdStr, 10), JSON.parse(posJson));
+            } catch (err) {
+              // Ignorar JSON malformado
+            }
+          }
+        }
+
+        // Limpiar cachés antiguas en Redis para los Tenants detectados
+        for (const t of tenantsList) {
+          const tenantSlug = t.subdomain;
+          await this.redis.del(`${tenantSlug}_cache_vehiculos`);
+          await this.redis.del(`${tenantSlug}_cache_tickets`);
+        }
+        await this.redis.del('gps:device-to-tenant');
+        await this.redis.del('gps:vehicle-to-device');
+
+        // Cargar mapas de rutas
         const routesList = await this.routeRepository.find();
         const routeMap = new Map<string, string>();
         for (const r of routesList) {
           routeMap.set(r.id, r.name);
         }
 
-        // 1. Obtener todos los vehículos con traccarDeviceId configurado
+        // 1. Obtener todos los vehículos
         const vehicles = await this.vehicleRepository.find() as any[];
         
-        // 2. Obtener los tickets activos del día actual de trabajo en hora de Pucallpa/Lima (America/Lima)
+        // 2. Obtener los tickets activos del día actual de trabajo
         const todayStr = getLocalDateString();
         
         const activeTickets = await this.ticketRepository.find({
@@ -128,7 +145,7 @@ export class VehicleTenantCache implements OnModuleInit {
           pendingInfractionTicketIds.add(inf.dailyTicketId);
         }
 
-        // Mapear los tickets activos por vehicleId para búsqueda rápida en memoria
+        // Mapear los tickets activos por vehicleId
         const activeTicketsByVehicle = new Map<string, { 
           ticketId: string; 
           driverName: string; 
@@ -170,12 +187,12 @@ export class VehicleTenantCache implements OnModuleInit {
           });
         }
 
-        // 3. Autocuración dinámica: Consultar a Traccar solo si se detectan vehículos activos sin traccarId local guardado
+        // 3. Autocuración de traccarId si falta localmente
         const needsTraccarApiFetch = vehicles.some(v => v.traccarDeviceId && !v.traccarId);
         const traccarDeviceMap = new Map<string, number>();
 
         if (needsTraccarApiFetch) {
-          this.logger.log('Se detectaron vehículos sin traccarId localmente en la base de datos. Consultando API de Traccar para autocuración en memoria...');
+          this.logger.log('[Cache Redis] Se detectaron vehículos sin traccarId localmente. Consultando API de Traccar para autocuración...');
           try {
             const traccarUrl = this.configService.get<string>('TRACCAR_URL') || 'http://localhost:8082';
             const traccarAuth = this.configService.get<string>('TRACCAR_AUTHORIZATION') || '';
@@ -196,16 +213,13 @@ export class VehicleTenantCache implements OnModuleInit {
                   traccarDeviceMap.set(device.uniqueId, device.id);
                 }
               }
-              this.logger.log(`Mapeo de dispositivos Traccar cargado de forma auxiliar. ${traccarDeviceMap.size} dispositivos encontrados.`);
-            } else {
-              this.logger.warn(`No se pudo obtener el mapeo dinámico de Traccar. Código de estado: ${response.status}`);
             }
           } catch (traccarError: any) {
-            this.logger.error(`Error al consultar dispositivos auxiliares en Traccar: ${traccarError.message}`);
+            this.logger.error(`[Cache Redis] Error al consultar dispositivos auxiliares en Traccar: ${traccarError.message}`);
           }
         }
 
-        // 4. Estructurar y cargar la caché en memoria
+        // 4. Estructurar e hidratar Redis
         let loadedCount = 0;
         for (const vehicle of vehicles) {
           if (!vehicle.traccarDeviceId) continue;
@@ -213,18 +227,18 @@ export class VehicleTenantCache implements OnModuleInit {
           let traccarIdNum: number | undefined = vehicle.traccarId ?? undefined;
           
           if (traccarIdNum === undefined) {
-            // Si no está localmente, intentar obtenerlo del mapeo dinámico auxiliar de Traccar
             traccarIdNum = traccarDeviceMap.get(vehicle.traccarDeviceId);
           }
 
           if (traccarIdNum === undefined) {
-            // Fallback final: intentar parsear como número directamente si nada más funcionó
             traccarIdNum = parseInt(vehicle.traccarDeviceId, 10);
             if (isNaN(traccarIdNum)) {
-              this.logger.warn(`Vehículo "${vehicle.plate}" tiene un traccarDeviceId no numérico y no figura en Traccar: "${vehicle.traccarDeviceId}"`);
               continue;
             }
           }
+
+          const tenantSlug = this.tenantIdToSlug.get(vehicle.tenantId);
+          if (!tenantSlug) continue;
 
           const ticketData = activeTicketsByVehicle.get(vehicle.id) || null;
 
@@ -239,21 +253,28 @@ export class VehicleTenantCache implements OnModuleInit {
             routeId: ticketData ? ticketData.routeId : null,
             routeName: ticketData && ticketData.routeId ? (routeMap.get(ticketData.routeId) || 'Sin Ruta') : 'Sin Ruta',
             direction: ticketData ? ticketData.direction : null,
-            lastPosition: savedPositions.get(traccarIdNum) || undefined,
             roundId: ticketData ? ticketData.roundId : null,
             roundStatus: ticketData ? ticketData.roundStatus : null,
             hasPendingInfractions: ticketData ? ticketData.hasPendingInfractions : false,
           };
 
-          this.cache.set(traccarIdNum, state);
-          this.vehicleIdToTraccarId.set(vehicle.id, traccarIdNum);
+          // Inyectar en los Hashes de Redis correspondientes
+          await this.redis.hset('gps:device-to-tenant', traccarIdNum.toString(), tenantSlug);
+          await this.redis.hset('gps:vehicle-to-device', vehicle.id, traccarIdNum.toString());
+          await this.redis.hset(`${tenantSlug}_cache_tickets`, traccarIdNum.toString(), JSON.stringify(state));
+
+          const savedPos = savedPositions.get(traccarIdNum);
+          if (savedPos) {
+            await this.redis.hset(`${tenantSlug}_cache_vehiculos`, traccarIdNum.toString(), JSON.stringify(savedPos));
+          }
+
           loadedCount++;
         }
 
         this.lastLoadDate = todayStr;
-        this.logger.log(`Caché en memoria inicializada exitosamente para el día ${todayStr}. ${loadedCount} vehículos cargados.`);
+        this.logger.log(`[Cache Redis] Hidratación completada para el día ${todayStr}. ${loadedCount} vehículos registrados.`);
       } catch (error: any) {
-        this.logger.error(`Error crítico al inicializar la caché de monitoreo: ${error.message}`, error.stack);
+        this.logger.error(`[Cache Redis] Error crítico al inicializar la caché en Redis: ${error.message}`, error.stack);
       }
     })();
 
@@ -263,55 +284,86 @@ export class VehicleTenantCache implements OnModuleInit {
   /**
    * Obtiene el estado en memoria de un vehículo a partir de su ID de Traccar
    */
-  getVehicleState(traccarDeviceId: number | string): CachedVehicleState | null {
-    this.checkAndResetCacheIfNewDay().catch(err => 
-      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
-    );
-    const id = typeof traccarDeviceId === 'string' ? parseInt(traccarDeviceId, 10) : traccarDeviceId;
-    if (isNaN(id)) return null;
-    return this.cache.get(id) || null;
+  async getVehicleState(traccarDeviceId: number | string): Promise<CachedVehicleState | null> {
+    await this.checkAndResetCacheIfNewDay();
+    const idStr = traccarDeviceId.toString();
+    
+    // 1. Obtener el enrutamiento del Tenant
+    const tenantSlug = await this.redis.hget('gps:device-to-tenant', idStr);
+    if (!tenantSlug) return null;
+
+    // 2. Obtener el estado del ticket y la última posición de forma asíncrona
+    const [stateJson, posJson] = await Promise.all([
+      this.redis.hget(`${tenantSlug}_cache_tickets`, idStr),
+      this.redis.hget(`${tenantSlug}_cache_vehiculos`, idStr),
+    ]);
+
+    if (!stateJson) return null;
+
+    try {
+      const state: CachedVehicleState = JSON.parse(stateJson);
+      if (posJson) {
+        state.lastPosition = JSON.parse(posJson);
+      }
+      return state;
+    } catch (err) {
+      return null;
+    }
   }
 
   /**
-   * Actualiza la última posición conocida de un vehículo en la caché de memoria
+   * Actualiza la última posición conocida de un vehículo en la caché de Redis
    */
-  updateLastPosition(traccarDeviceId: number | string, position: any): void {
-    this.checkAndResetCacheIfNewDay().catch(err => 
-      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
-    );
-    const id = typeof traccarDeviceId === 'string' ? parseInt(traccarDeviceId, 10) : traccarDeviceId;
-    if (isNaN(id)) return;
-    const state = this.cache.get(id);
-    if (state) {
-      state.lastPosition = position;
-      this.cache.set(id, state);
-    }
+  async updateLastPosition(traccarDeviceId: number | string, position: any): Promise<void> {
+    await this.checkAndResetCacheIfNewDay();
+    const idStr = traccarDeviceId.toString();
+
+    const tenantSlug = await this.redis.hget('gps:device-to-tenant', idStr);
+    if (!tenantSlug) return;
+
+    await this.redis.hset(`${tenantSlug}_cache_vehiculos`, idStr, JSON.stringify(position));
   }
 
   /**
    * Obtiene la última posición conocida enriquecida de toda la flota de un tenant específico
    */
-  getLatestPositionsByTenant(tenantId: string): any[] {
-    this.checkAndResetCacheIfNewDay().catch(err => 
-      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
-    );
+  async getLatestPositionsByTenant(tenantId: string): Promise<any[]> {
+    await this.checkAndResetCacheIfNewDay();
+    
+    const tenantSlug = this.tenantIdToSlug.get(tenantId);
+    if (!tenantSlug) return [];
+
+    // Obtener en lote ambos mapas de Redis
+    const [ticketsMap, positionsMap] = await Promise.all([
+      this.redis.hgetall(`${tenantSlug}_cache_tickets`),
+      this.redis.hgetall(`${tenantSlug}_cache_vehiculos`),
+    ]);
+
     const positions: any[] = [];
-    for (const [_, state] of this.cache.entries()) {
-      if (state.tenantId === tenantId && state.lastPosition) {
-        positions.push({
-          ...state.lastPosition,
-          vehicleId: state.vehicleId,
-          plate: state.plate,
-          driverName: state.driverName,
-          driverId: state.driverId,
-          routeId: state.routeId,
-          direction: state.direction,
-          dailyTicketId: state.dailyTicketId,
-          hasActiveTicket: !!state.dailyTicketId,
-          roundId: state.roundId,
-          roundStatus: state.roundStatus,
-          hasPendingInfractions: state.hasPendingInfractions,
-        });
+    for (const [traccarIdStr, stateJson] of Object.entries(ticketsMap)) {
+      try {
+        const state: CachedVehicleState = JSON.parse(stateJson);
+        const posJson = positionsMap[traccarIdStr];
+        
+        if (posJson) {
+          const lastPosition = JSON.parse(posJson);
+          positions.push({
+            ...lastPosition,
+            vehicleId: state.vehicleId,
+            plate: state.plate,
+            driverName: state.driverName,
+            driverId: state.driverId,
+            routeId: state.routeId,
+            direction: state.direction,
+            dailyTicketId: state.dailyTicketId,
+            hasActiveTicket: !!state.dailyTicketId,
+            roundId: state.roundId,
+            roundStatus: state.roundStatus,
+            hasPendingInfractions: state.hasPendingInfractions,
+          });
+        }
+      } catch (err) {
+        // Ignorar JSON corrupto
       }
     }
     return positions;
@@ -320,46 +372,71 @@ export class VehicleTenantCache implements OnModuleInit {
   /**
    * Obtiene la última posición conocida enriquecida del vehículo asignado a un conductor específico
    */
-  getLatestPositionByDriver(driverId: string): any | null {
-    this.checkAndResetCacheIfNewDay().catch(err => 
-      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
-    );
-    for (const [_, state] of this.cache.entries()) {
-      if (state.driverId === driverId && state.lastPosition) {
-        return {
-          ...state.lastPosition,
-          vehicleId: state.vehicleId,
-          plate: state.plate,
-          driverName: state.driverName,
-          driverId: state.driverId,
-          routeId: state.routeId,
-          direction: state.direction,
-          dailyTicketId: state.dailyTicketId,
-          hasActiveTicket: !!state.dailyTicketId,
-          roundId: state.roundId,
-          roundStatus: state.roundStatus,
-          hasPendingInfractions: state.hasPendingInfractions,
-        };
+  async getLatestPositionByDriver(driverId: string): Promise<any | null> {
+    await this.checkAndResetCacheIfNewDay();
+
+    // Recorrer los tenants a través de los mapas en RAM
+    for (const tenantSlug of this.tenantIdToSlug.values()) {
+      const ticketsMap = await this.redis.hgetall(`${tenantSlug}_cache_tickets`);
+      
+      for (const [traccarIdStr, stateJson] of Object.entries(ticketsMap)) {
+        try {
+          const state: CachedVehicleState = JSON.parse(stateJson);
+          
+          if (state.driverId === driverId) {
+            const posJson = await this.redis.hget(`${tenantSlug}_cache_vehiculos`, traccarIdStr);
+            if (posJson) {
+              const lastPosition = JSON.parse(posJson);
+              return {
+                ...lastPosition,
+                vehicleId: state.vehicleId,
+                plate: state.plate,
+                driverName: state.driverName,
+                driverId: state.driverId,
+                routeId: state.routeId,
+                direction: state.direction,
+                dailyTicketId: state.dailyTicketId,
+                hasActiveTicket: !!state.dailyTicketId,
+                roundId: state.roundId,
+                roundStatus: state.roundStatus,
+                hasPendingInfractions: state.hasPendingInfractions,
+              };
+            }
+            return null;
+          }
+        } catch (err) {
+          // Ignorar
+        }
       }
     }
     return null;
   }
 
-
   /**
-   * Registra o actualiza en caliente el ticket diario de un vehículo en la caché
+   * Registra o actualiza en caliente el ticket diario de un vehículo en la caché de Redis
    */
   async setDailyTicketId(vehicleId: string, dailyTicketId: string | null): Promise<void> {
     await this.checkAndResetCacheIfNewDay();
-    const traccarId = this.vehicleIdToTraccarId.get(vehicleId);
-    if (traccarId === undefined) {
-      this.logger.warn(`Intento de actualizar ticket para vehículo ${vehicleId} pero no existe en caché.`);
+    const traccarIdStr = await this.redis.hget('gps:vehicle-to-device', vehicleId);
+    if (!traccarIdStr) {
+      this.logger.warn(`Intento de actualizar ticket para vehículo ${vehicleId} pero no existe traducción en Redis.`);
       return;
     }
 
-    const currentState = this.cache.get(traccarId);
-    if (currentState) {
-      // Guardar el driverId anterior antes de la actualización
+    const tenantSlug = await this.redis.hget('gps:device-to-tenant', traccarIdStr);
+    if (!tenantSlug) {
+      this.logger.warn(`Intento de actualizar ticket para vehículo ${vehicleId} pero no tiene tenant mapeado.`);
+      return;
+    }
+
+    const stateJson = await this.redis.hget(`${tenantSlug}_cache_tickets`, traccarIdStr);
+    if (!stateJson) {
+      this.logger.warn(`Intento de actualizar ticket para vehículo ${vehicleId} pero no hay estado inicial en Redis.`);
+      return;
+    }
+
+    try {
+      const currentState: CachedVehicleState = JSON.parse(stateJson);
       const previousDriverId = currentState.driverId;
 
       currentState.dailyTicketId = dailyTicketId;
@@ -374,41 +451,37 @@ export class VehicleTenantCache implements OnModuleInit {
       let hasPendingInfractions = false;
 
       if (dailyTicketId) {
-        try {
-          const ticket = await this.ticketRepository.findOne({
-            where: { id: dailyTicketId },
-            relations: ['driver', 'rounds'],
-          });
-          if (ticket) {
-            driverName = ticket.driver ? ticket.driver.name : 'No asignado';
-            driverId = ticket.driverId || null;
-            routeId = ticket.routeId || null;
-            
-            if (ticket.routeId) {
-              const routeObj = await this.routeRepository.findOne({ where: { id: ticket.routeId } });
-              routeName = routeObj ? routeObj.name : 'Sin Ruta';
-            }
-            
-            if (ticket.rounds && ticket.rounds.length > 0) {
-              const activeRound = ticket.rounds.find(r => r.status === RoundsStatus.IN_PROGRESS)
-                || ticket.rounds.find(r => r.status === RoundsStatus.PENDING)
-                || ticket.rounds[ticket.rounds.length - 1];
-              if (activeRound) {
-                direction = activeRound.direction as any;
-                roundId = activeRound.id;
-                roundStatus = activeRound.status as any;
-              }
-            } else {
-              direction = 'IDA';
-            }
-
-            const pendingCount = await this.infractionRepository.count({
-              where: { dailyTicketId, status: InfractionStatus.PENDING }
-            });
-            hasPendingInfractions = pendingCount > 0;
+        const ticket = await this.ticketRepository.findOne({
+          where: { id: dailyTicketId },
+          relations: ['driver', 'rounds'],
+        });
+        if (ticket) {
+          driverName = ticket.driver ? ticket.driver.name : 'No asignado';
+          driverId = ticket.driverId || null;
+          routeId = ticket.routeId || null;
+          
+          if (ticket.routeId) {
+            const routeObj = await this.routeRepository.findOne({ where: { id: ticket.routeId } });
+            routeName = routeObj ? routeObj.name : 'Sin Ruta';
           }
-        } catch (error: any) {
-          this.logger.error(`Error al obtener chofer, ruta y multas para ticket en caliente: ${error.message}`);
+          
+          if (ticket.rounds && ticket.rounds.length > 0) {
+            const activeRound = ticket.rounds.find(r => r.status === RoundsStatus.IN_PROGRESS)
+              || ticket.rounds.find(r => r.status === RoundsStatus.PENDING)
+              || ticket.rounds[ticket.rounds.length - 1];
+            if (activeRound) {
+              direction = activeRound.direction as any;
+              roundId = activeRound.id;
+              roundStatus = activeRound.status as any;
+            }
+          } else {
+            direction = 'IDA';
+          }
+
+          const pendingCount = await this.infractionRepository.count({
+            where: { dailyTicketId, status: InfractionStatus.PENDING }
+          });
+          hasPendingInfractions = pendingCount > 0;
         }
       }
       
@@ -421,52 +494,71 @@ export class VehicleTenantCache implements OnModuleInit {
       currentState.roundStatus = roundStatus;
       currentState.hasPendingInfractions = hasPendingInfractions;
 
-      this.cache.set(traccarId, currentState);
-      this.logger.log(`Caché actualizada en caliente: Vehículo ID ${vehicleId} -> Ticket ID ${dailyTicketId}, Chofer: ${driverName} (ID: ${driverId}), Ruta: ${routeId}, Dirección: ${direction}, Vuelta: ${roundId} (${roundStatus}), Multas: ${hasPendingInfractions}`);
-      
+      // Escribir en caliente en Redis
+      await this.redis.hset(`${tenantSlug}_cache_tickets`, traccarIdStr, JSON.stringify(currentState));
+      this.logger.log(`[Cache Redis] Asignado ticket ${dailyTicketId} a vehículo ${vehicleId} en Redis.`);
+
       // Notificar reactivamente a los suscriptores (WebSockets)
       this.cacheUpdates$.next({ vehicleId, state: currentState, previousDriverId });
+    } catch (error: any) {
+      this.logger.error(`Error al actualizar el ticket diario en caliente en Redis: ${error.message}`);
     }
   }
 
   /**
-   * Agrega o actualiza un vehículo completo en la caché (al crearlo o editarlo en el sistema)
+   * Agrega o actualiza un vehículo completo en la caché de Redis
    */
-  setVehicleState(traccarDeviceId: number, state: CachedVehicleState): void {
-    this.checkAndResetCacheIfNewDay().catch(err => 
-      this.logger.error(`[Cache] Error al verificar auto-reinicio perezoso: ${err.message}`)
-    );
-    this.cache.set(traccarDeviceId, state);
-    this.vehicleIdToTraccarId.set(state.vehicleId, traccarDeviceId);
-    this.logger.log(`Vehículo registrado en caché de monitoreo: Traccar ID ${traccarDeviceId}`);
+  async setVehicleState(traccarDeviceId: number, state: CachedVehicleState): Promise<void> {
+    await this.checkAndResetCacheIfNewDay();
+    const traccarIdStr = traccarDeviceId.toString();
+    
+    const tenantSlug = this.tenantIdToSlug.get(state.tenantId);
+    if (!tenantSlug) return;
+
+    // Guardar enrutamiento global
+    await this.redis.hset('gps:device-to-tenant', traccarIdStr, tenantSlug);
+    await this.redis.hset('gps:vehicle-to-device', state.vehicleId, traccarIdStr);
+
+    // Separar posición de estado
+    const { lastPosition, ...ticketState } = state;
+    await this.redis.hset(`${tenantSlug}_cache_tickets`, traccarIdStr, JSON.stringify(ticketState));
+    if (lastPosition) {
+      await this.redis.hset(`${tenantSlug}_cache_vehiculos`, traccarIdStr, JSON.stringify(lastPosition));
+    }
   }
 
   /**
-   * Elimina un vehículo de la caché (al darlo de baja o cambiar su IMEI en el sistema)
+   * Elimina un vehículo de la caché de Redis
    */
-  removeVehicleState(traccarDeviceId: number, vehicleId?: string): void {
-    this.cache.delete(traccarDeviceId);
+  async removeVehicleState(traccarDeviceId: number, vehicleId?: string): Promise<void> {
+    const traccarIdStr = traccarDeviceId.toString();
+    const tenantSlug = await this.redis.hget('gps:device-to-tenant', traccarIdStr);
+    
+    if (tenantSlug) {
+      await this.redis.hdel(`${tenantSlug}_cache_vehiculos`, traccarIdStr);
+      await this.redis.hdel(`${tenantSlug}_cache_tickets`, traccarIdStr);
+    }
+    await this.redis.hdel('gps:device-to-tenant', traccarIdStr);
     if (vehicleId) {
-      this.vehicleIdToTraccarId.delete(vehicleId);
+      await this.redis.hdel('gps:vehicle-to-device', vehicleId);
     }
-    this.logger.log(`Vehículo de monitoreo removido de caché: Traccar ID ${traccarDeviceId}`);
   }
 
   /**
    * Valida si el día de hoy difiere del día en que se cargó la caché.
-   * Si es así, realiza un auto-reinicio en segundo plano de manera asíncrona.
+   * Si es así, realiza un auto-reinicio de manera asíncrona.
    */
   private async checkAndResetCacheIfNewDay(): Promise<void> {
     const todayStr = getLocalDateString();
 
     if (this.lastLoadDate && this.lastLoadDate !== todayStr) {
-      this.logger.log(`[Cache] Cambio de día detectado (Antes: ${this.lastLoadDate}, Ahora: ${todayStr}). Reiniciando y precargando caché...`);
+      this.logger.log(`[Cache Redis] Cambio de día detectado (Antes: ${this.lastLoadDate}, Ahora: ${todayStr}). Reiniciando...`);
       await this.resetCache();
     }
   }
 
   /**
-   * Programa la tarea de medianoche (00:05) de forma autónoma con temporizadores puros.
+   * Programa la tarea de medianoche (00:05) de forma autónoma.
    */
   private scheduleMidnightReset() {
     if (this.midnightTimeout) {
@@ -476,66 +568,73 @@ export class VehicleTenantCache implements OnModuleInit {
     const now = new Date();
     const midnight = new Date();
     
-    // Programar para las 00:05 de la mañana del día siguiente
     midnight.setHours(24, 5, 0, 0);
     const msUntilMidnight = midnight.getTime() - now.getTime();
 
-    this.logger.log(`[Cache] Programando reinicio automático diario de caché en ${Math.round(msUntilMidnight / 1000 / 60)} minutos (a las 00:05).`);
+    this.logger.log(`[Cache Redis] Programando reinicio diario automático en ${Math.round(msUntilMidnight / 1000 / 60)} minutos (a las 00:05).`);
 
     this.midnightTimeout = setTimeout(async () => {
-      this.logger.log('[Cache] Cron de medianoche activado. Reiniciando caché de tickets para el nuevo día...');
+      this.logger.log('[Cache Redis] Cron de medianoche activado. Reiniciando caché...');
       try {
         await this.resetCache();
       } catch (error: any) {
-        this.logger.error(`[Cache] Error en el reinicio programado a medianoche: ${error.message}`);
+        this.logger.error(`[Cache Redis] Error en el reinicio de medianoche: ${error.message}`);
       }
-      // Re-programar de forma recursiva para el próximo día
       this.scheduleMidnightReset();
     }, msUntilMidnight);
   }
 
   /**
-   * Fuerza el reinicio completo de la caché en memoria y la hidratación desde la base de datos fresca.
+   * Fuerza el reinicio completo de la caché en Redis e hidratación desde PostgreSQL.
    */
   async resetCache(options?: { unlinkDevices?: boolean }): Promise<void> {
-    const unlink = options?.unlinkDevices ?? true;
-    this.logger.log(`[Cache] Forzando el reinicio completo de la caché de vehículos y tickets. ¿Desvincular de Traccar?: ${unlink}`);
+    const unlink = options?.unlinkDevices ?? false;
+    this.logger.log(`[Cache Redis] resetCache invocado. ¿Desafiliar de Traccar?: ${unlink}`);
 
     if (unlink) {
-      // DESAFILIAR EN LOTE DE GRUPOS EN TRACCAR ANTES DE LIMPIAR LA MEMORIA
       try {
-        const activeVehicles = Array.from(this.cache.entries())
-          .filter(([traccarId, state]) => state.dailyTicketId !== null)
-          .map(([traccarId, state]) => ({
-            traccarId,
-            plate: state.plate
-          }));
-
-        if (activeVehicles.length > 0) {
-          this.logger.log(`[Cache - Fin de Día] Desafiliando ${activeVehicles.length} vehículo(s) de sus grupos de ruta en Traccar...`);
-          const updatePromises = activeVehicles.map(async (v) => {
-            // Busquemos en base de datos el vehículo para obtener su uniqueId (traccarDeviceId) real
-            const vehicleObj = await this.vehicleRepository.findOne({ where: { traccarId: v.traccarId } });
-            if (vehicleObj && vehicleObj.traccarDeviceId) {
-              await this.traccarProvider.updateDevice(v.traccarId, {
-                name: vehicleObj.plate,
-                uniqueId: vehicleObj.traccarDeviceId,
-                groupId: 0 // 0 remueve el grupo en la API de Traccar
-              });
-            }
-          });
+        // Consultar los tenants activos para desafiliar
+        const tenantsList = await this.tenantRepository.find();
+        
+        for (const t of tenantsList) {
+          const tenantSlug = t.subdomain;
+          const ticketsMap = await this.redis.hgetall(`${tenantSlug}_cache_tickets`);
           
-          await Promise.allSettled(updatePromises);
-          this.logger.log(`[Cache - Fin de Día] Desafiliación en lote completada con éxito.`);
+          const activeVehicles = Object.entries(ticketsMap)
+            .map(([traccarIdStr, stateJson]) => {
+              try {
+                const state = JSON.parse(stateJson);
+                if (state.dailyTicketId !== null) {
+                  return { traccarId: parseInt(traccarIdStr, 10), plate: state.plate };
+                }
+              } catch (e) {}
+              return null;
+            })
+            .filter(v => v !== null) as any[];
+
+          if (activeVehicles.length > 0) {
+            this.logger.log(`[Cache Redis] Desafiliando ${activeVehicles.length} vehículo(s) del tenant ${tenantSlug} en Traccar...`);
+            const updatePromises = activeVehicles.map(async (v) => {
+              const vehicleObj = await this.vehicleRepository.findOne({ where: { traccarId: v.traccarId } });
+              if (vehicleObj && vehicleObj.traccarDeviceId) {
+                await this.traccarProvider.updateDevice(v.traccarId, {
+                  name: vehicleObj.plate,
+                  uniqueId: vehicleObj.traccarDeviceId,
+                  groupId: 0
+                });
+              }
+            });
+            await Promise.allSettled(updatePromises);
+          }
         }
       } catch (err: any) {
-        this.logger.error(`[Cache - Fin de Día] Error al desafiliar vehículos en lote de Traccar: ${err.message}`);
+        this.logger.error(`[Cache Redis] Error al desafiliar en lote de Traccar: ${err.message}`);
       }
     }
 
     // Anular infracciones TENTATIVE residuales de días anteriores de forma masiva
     try {
-      this.logger.log(`[Cache - Fin de Día] Anulando infracciones tentativas residuales de días anteriores...`);
+      this.logger.log(`[Cache Redis] Anulando infracciones tentativas de días anteriores...`);
       const updateResult = await this.infractionRepository.update(
         { status: InfractionStatus.TENTATIVE },
         { 
@@ -543,9 +642,9 @@ export class VehicleTenantCache implements OnModuleInit {
           cancellationReason: 'Anulada automáticamente en el reinicio de jornada del sistema (no convalidada por satélite).'
         }
       );
-      this.logger.log(`[Cache - Fin de Día] Infracciones tentativas residuales anuladas: ${updateResult.affected ?? 0}`);
+      this.logger.log(`[Cache Redis] Infracciones tentativas residuales anuladas: ${updateResult.affected ?? 0}`);
     } catch (err: any) {
-      this.logger.error(`[Cache - Fin de Día] Error al anular infracciones tentativas residuales: ${err.message}`);
+      this.logger.error(`[Cache Redis] Error al anular infracciones tentativas de días anteriores: ${err.message}`);
     }
 
     this.preloadPromise = null;
@@ -553,18 +652,35 @@ export class VehicleTenantCache implements OnModuleInit {
   }
 
   /**
-   * Obtiene una previsualización de diagnóstico de la caché en caliente
+   * Obtiene una previsualización de diagnóstico de la caché en Redis
    */
-  getCacheStatus(): any[] {
+  async getCacheStatus(): Promise<any[]> {
+    await this.checkAndResetCacheIfNewDay();
     const list: any[] = [];
-    for (const [traccarId, state] of this.cache.entries()) {
-      list.push({
-        traccarDeviceId: traccarId,
-        ...state,
-        hasActiveTicket: !!state.dailyTicketId,
-      });
+
+    for (const tenantSlug of this.tenantIdToSlug.values()) {
+      const [ticketsMap, positionsMap] = await Promise.all([
+        this.redis.hgetall(`${tenantSlug}_cache_tickets`),
+        this.redis.hgetall(`${tenantSlug}_cache_vehiculos`),
+      ]);
+
+      for (const [traccarIdStr, stateJson] of Object.entries(ticketsMap)) {
+        try {
+          const state: CachedVehicleState = JSON.parse(stateJson);
+          const posJson = positionsMap[traccarIdStr];
+          
+          if (posJson) {
+            state.lastPosition = JSON.parse(posJson);
+          }
+
+          list.push({
+            traccarDeviceId: parseInt(traccarIdStr, 10),
+            ...state,
+            hasActiveTicket: !!state.dailyTicketId,
+          });
+        } catch (e) {}
+      }
     }
-    // Ordenar por placa para facilitar el diagnóstico
     return list.sort((a, b) => a.plate.localeCompare(b.plate));
   }
 }

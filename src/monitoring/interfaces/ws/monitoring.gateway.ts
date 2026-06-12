@@ -102,8 +102,7 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
         this.logger.log(`[Socket.io] Cliente público ${socket.id} conectado con éxito al Tenant "${tenant.name}". Sala unida.`);
 
         // Emitir posiciones iniciales sanitizadas (solo despachadas)
-        const allPositions = this.vehicleTenantCache.getLatestPositionsByTenant(tenant.id);
-        const activePositions = allPositions.filter(pos => pos.dailyTicketId !== null);
+        const activePositions = await this.vehicleTenantCache.getLatestPositionsByTenant(tenant.id);
         
         if (activePositions.length > 0) {
           // Mapeamos para el formato que espera el widget público
@@ -148,7 +147,7 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
       this.logger.log(`[Socket.io] Cliente ${socket.id} autenticado con éxito para Tenant: "${tenantId}". Unido a la sala.`);
 
       // 4. State Cache: Emitir instantáneamente las últimas posiciones conocidas del tenant (evento positions)
-      const initialPositions = this.vehicleTenantCache.getLatestPositionsByTenant(tenantId);
+      const initialPositions = await this.vehicleTenantCache.getLatestPositionsByTenant(tenantId);
       if (initialPositions.length > 0) {
         socket.emit('positions', initialPositions);
         this.logger.log(`[Socket.io] Latencia Cero: Enviadas ${initialPositions.length} posiciones iniciales en caliente al cliente ${socket.id}`);
@@ -231,7 +230,7 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
    */
   private subscribeToTraccarPositions() {
     this.traccarSubscription = this.traccarSocketService.positions$.subscribe({
-      next: (positions) => {
+      next: async (positions) => {
         try {
           // Agrupamos las posiciones enriquecidas por tenantId para emitir de forma eficiente en ráfagas
           const positionsByTenant = new Map<string, any[]>();
@@ -240,9 +239,9 @@ export class MonitoringGateway implements OnGatewayConnection, OnGatewayInit, On
             if (!pos.deviceId) continue;
 
             // 1. Actualizar el State Cache en memoria con la última posición del vehículo
-            this.vehicleTenantCache.updateLastPosition(pos.deviceId, pos);
+            await this.vehicleTenantCache.updateLastPosition(pos.deviceId, pos);
 
-            const state = this.vehicleTenantCache.getVehicleState(pos.deviceId);
+            const state = await this.vehicleTenantCache.getVehicleState(pos.deviceId);
             if (!state) {
               // El vehículo no está registrado o no cuenta con traccarDeviceId mapeado en la caché
               continue;

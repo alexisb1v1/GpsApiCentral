@@ -79,7 +79,7 @@ export class DriverGateway implements OnGatewayConnection, OnGatewayInit, OnModu
       this.logger.log(`[Driver WS] Chofer ${driverId} (Tenant: "${tenantId}") autenticado de forma exitosa. Unido a la sala.`);
 
       // 4. State Cache Latencia Cero: Emitir instantáneamente la última posición conocida de su vehículo asignado
-      const initialPosition = this.vehicleTenantCache.getLatestPositionByDriver(driverId);
+      const initialPosition = await this.vehicleTenantCache.getLatestPositionByDriver(driverId);
       if (initialPosition) {
         socket.emit('positions', [initialPosition]);
         this.logger.log(`[Driver WS] Latencia Cero: Enviada posición inicial en caliente del vehículo del chofer ${driverId}`);

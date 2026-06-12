@@ -17,6 +17,7 @@ import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-ten
 import { RoundsStatus } from '@daily-ticket/domain/entities/daily-round.entity';
 import { getLocalDateString, getLocalTimeString } from '@shared/utils/date.util';
 import { ROUTE_DELAY_TOLERANCE_MINUTES } from '@shared/domain/constants/business.constants';
+import { RoundCompletedEvent } from '@tracking/domain/events/round-completed.event';
 
 
 
@@ -52,11 +53,12 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     const { event, device, position } = payload;
 
     if (!event || !event.deviceId) return;
+    const traccarDeviceId = event.deviceId;
 
     await this.trackingEventRepository.manager.transaction(async (transactionalManager) => {
       // 1. Buscar Vehículo por traccarId
       const vehicle = await transactionalManager.findOne(VehicleEntity, {
-        where: { traccarId: event.deviceId }
+        where: { traccarId: traccarDeviceId }
       });
       if (!vehicle) return;
 
@@ -91,7 +93,40 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
       const roundId = activeRound ? activeRound.id : null;
       if (!roundId) return;
 
-      const eventTime = new Date(position.fixTime);
+      let eventTime = new Date(position.fixTime);
+
+      if (event.type === 'geofenceEnter') {
+        try {
+          const cachedState = await this.vehicleTenantCache.getVehicleState(traccarDeviceId);
+          if (cachedState && cachedState.lastPosition && routeStop.coordinates && routeStop.coordinates.length > 0) {
+            const prevPos = cachedState.lastPosition;
+            const prevTime = new Date(prevPos.deviceTime || prevPos.fixTime || prevPos.lastUpdate);
+            const currTime = new Date(position.fixTime);
+            
+            if (currTime.getTime() > prevTime.getTime()) {
+              const sumLat = routeStop.coordinates.reduce((sum, c) => sum + c.lat, 0);
+              const sumLng = routeStop.coordinates.reduce((sum, c) => sum + c.lng, 0);
+              const stopCenter = {
+                lat: sumLat / routeStop.coordinates.length,
+                lng: sumLng / routeStop.coordinates.length,
+              };
+
+              const prevLat = prevPos.latitude !== undefined ? Number(prevPos.latitude) : Number(prevPos.lat || 0);
+              const prevLng = prevPos.longitude !== undefined ? Number(prevPos.longitude) : Number(prevPos.lng || 0);
+              const currLat = position.latitude !== undefined ? Number(position.latitude) : 0;
+              const currLng = position.longitude !== undefined ? Number(position.longitude) : 0;
+
+              eventTime = interpolateArrivalTime(
+                { lat: prevLat, lng: prevLng, time: prevTime },
+                { lat: currLat, lng: currLng, time: currTime },
+                stopCenter
+              );
+            }
+          }
+        } catch (cacheErr: any) {
+          console.error('[Webhook Traccar] Error al interpolar hora de cruce:', cacheErr.message);
+        }
+      }
 
       if (event.type === 'geofenceEnter') {
         // CONCILIACIÓN JERÁRQUICA
@@ -406,6 +441,7 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
     activeRound.status = RoundsStatus.COMPLETED;
     activeRound.endTime = arrivalTime;
     await manager.save(activeRound);
+    this.eventBus.publish(new RoundCompletedEvent(activeRound.id));
 
     const nextDirection = activeRound.direction === 'IDA' ? 'VUELTA' : 'IDA';
 
@@ -418,4 +454,22 @@ export class ProcessTraccarWebhookHandler implements ICommandHandler<ProcessTrac
 
     await this.vehicleTenantCache.setDailyTicketId(vehicleId, ticket.id);
   }
+}
+
+function interpolateArrivalTime(
+  prev: { lat: number; lng: number; time: Date },
+  curr: { lat: number; lng: number; time: Date },
+  stop: { lat: number; lng: number }
+): Date {
+  const dLat = curr.lat - prev.lat;
+  const dLng = curr.lng - prev.lng;
+  const denominator = dLat * dLat + dLng * dLng;
+  
+  if (denominator === 0) return curr.time;
+  
+  const f = ((stop.lat - prev.lat) * dLat + (stop.lng - prev.lng) * dLng) / denominator;
+  const clampedF = Math.max(0, Math.min(1, f));
+  
+  const timeDiff = curr.time.getTime() - prev.time.getTime();
+  return new Date(prev.time.getTime() + clampedF * timeDiff);
 }

@@ -16,6 +16,7 @@ import { DriverNotificationSentEvent } from '@monitoring/domain/events/driver-no
 import { VehicleTenantCache } from '@monitoring/infrastructure/cache/vehicle-tenant.cache';
 import { randomUUID } from 'crypto';
 import { ROUTE_DELAY_TOLERANCE_MINUTES } from '@shared/domain/constants/business.constants';
+import { RoundCompletedEvent } from '@tracking/domain/events/round-completed.event';
 
 
 @CommandHandler(ConciliateOfflineEventsCommand)
@@ -416,6 +417,7 @@ export class ConciliateOfflineEventsHandler implements ICommandHandler<Conciliat
     activeRound.status = RoundsStatus.COMPLETED;
     activeRound.endTime = arrivalTime;
     await manager.save(activeRound);
+    this.eventBus.publish(new RoundCompletedEvent(activeRound.id));
 
     const nextDirection = activeRound.direction === 'IDA' ? 'VUELTA' : 'IDA';
 

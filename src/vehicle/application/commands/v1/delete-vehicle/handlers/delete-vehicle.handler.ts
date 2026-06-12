@@ -39,7 +39,7 @@ export class DeleteVehicleHandler implements ICommandHandler<DeleteVehicleComman
     
     if (saveResult.isOk()) {
       if (oldTraccarId) {
-        this.vehicleTenantCache.removeVehicleState(oldTraccarId, vehicle.id);
+        await this.vehicleTenantCache.removeVehicleState(oldTraccarId, vehicle.id);
         // Dar de baja físicamente en Traccar
         await this.traccarProvider.deleteDevice(oldTraccarId);
       }

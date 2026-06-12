@@ -42,7 +42,7 @@ export class MonitoringCacheController {
   @ApiOperation({ summary: 'Obtener la previsualización de diagnóstico legible de la caché en caliente' })
   @ApiResponse({ status: 200, description: 'Previsualización de la caché obtenida de forma exitosa' })
   async getCacheStatus() {
-    const data = this.vehicleTenantCache.getCacheStatus();
+    const data = await this.vehicleTenantCache.getCacheStatus();
     return {
       status: 'success',
       data,

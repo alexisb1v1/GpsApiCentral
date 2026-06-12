@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { BullModule } from '@nestjs/bullmq';
 import { APP_GUARD } from '@nestjs/core';
 import { HealthCheckController } from './healthcheck.controller';
 import { DatabaseModule } from '@shared/infrastructure/database/database.module';
@@ -25,6 +26,17 @@ import { AuditLogModule } from './audit-log/infrastructure/nestjs/audit-log.modu
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST') || 'localhost',
+          port: config.get<number>('REDIS_PORT') || 6380,
+          password: config.get<string>('REDIS_PASSWORD') || undefined,
+        },
+      }),
+      inject: [ConfigService],
     }),
     CqrsModule.forRoot(),
     DatabaseModule,
